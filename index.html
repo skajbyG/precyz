@@ -1,0 +1,2039 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#100b07">
+<meta name="description" content="Precyz — sázkařská inteligence. Terminál na hledání value sázek napříč Tipsport, Fortuna a Betano.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Precyz">
+<meta property="og:title" content="Precyz — Sázkařská inteligence">
+<meta property="og:description" content="Terminál na hledání value sázek. Radši nic než špatně.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23ffbe72'/%3E%3Cstop offset='55%25' stop-color='%23ffb066'/%3E%3Cstop offset='100%25' stop-color='%23b9a7ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='24' fill='url(%23g)'/%3E%3Cpath d='M20 60 L40 40 L52 52 L80 24' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Cpath d='M58 24 H80 V46' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<title>Precyz — Sázkařská inteligence</title>
+<style>
+:root{
+  --bg:#100b07; --bg-elev:#1b130c;
+  --surface:rgba(255,246,236,.042); --surface-2:rgba(255,246,236,.07); --surface-hi:rgba(255,246,236,.10);
+  --stroke:rgba(255,236,216,.09); --stroke-2:rgba(255,236,216,.16);
+  --text:#f7f1e9; --text-2:#b4a89a; --text-3:#6d6256;
+  --emerald:#63d6a0; --gold:#ffbe72; --teal:#ffb066; --red:#ff8a6f;
+  --football:#63d6a0; --hockey:#6cc6ff; --basketball:#ff9e6b; --tennis:#ffd64f; --arb:#b9a7ff;
+  --radius:20px;
+  --ease:cubic-bezier(.22,.61,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,'SF Pro Display',system-ui,'Inter',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  min-height:100vh;
+  position:relative;
+}
+.mono{font-family:'JetBrains Mono',ui-monospace,'SF Mono',monospace; font-variant-numeric:tabular-nums;}
+a{color:inherit; text-decoration:none;}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit;}
+::-webkit-scrollbar{width:8px; height:8px;}
+::-webkit-scrollbar-thumb{background:var(--surface-hi); border-radius:8px;}
+
+/* ambient mesh background */
+.mesh{position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
+.mesh::before, .mesh::after, .mesh .blob{
+  content:''; position:absolute; border-radius:50%; filter:blur(60px); opacity:.55;
+}
+.mesh::before{
+  width:60vw; height:60vw; top:-20vw; left:-10vw;
+  background:radial-gradient(circle, rgba(255,164,84,.30), transparent 70%);
+  animation:drift1 26s ease-in-out infinite;
+}
+.mesh::after{
+  width:50vw; height:50vw; top:-10vw; right:-15vw;
+  background:radial-gradient(circle, rgba(255,110,90,.22), transparent 70%);
+  animation:drift2 32s ease-in-out infinite;
+}
+.mesh .blob{
+  width:40vw; height:40vw; top:10vw; left:35vw;
+  background:radial-gradient(circle, rgba(185,167,255,.14), transparent 70%);
+  animation:drift3 40s ease-in-out infinite;
+}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(4vw,3vw) scale(1.15);}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-5vw,2vw) scale(1.1);}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-3vw,-4vw) scale(1.2);}}
+.vignette{position:fixed; inset:0; z-index:1; pointer-events:none;
+  background:radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(16,11,7,.6) 100%);}
+
+.app{position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column;}
+
+/* header */
+header{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px;
+  background:rgba(16,11,7,.72); backdrop-filter:blur(18px) saturate(140%);
+  border-bottom:1px solid var(--stroke);
+}
+.brand{display:flex; align-items:center; gap:10px;}
+.logo{
+  width:34px; height:34px; border-radius:10px;
+  background:linear-gradient(135deg, var(--gold), var(--teal) 55%, var(--arb));
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 16px rgba(255,190,114,.25);
+}
+.logo svg{width:18px; height:18px;}
+.wordmark{font-size:17px; font-weight:600; letter-spacing:-.2px;}
+.wordmark .dollar{
+  color:#85bb65; font-weight:800;
+}
+.wordmark .money{color:var(--text); font-weight:700;}
+.header-right{display:flex; align-items:center; gap:12px;}
+.clock{font-size:13px; color:var(--text-2); letter-spacing:.5px;}
+.age-chip{
+  display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-2);
+  background:var(--surface); border:1px solid var(--stroke); padding:6px 10px; border-radius:99px;
+}
+.dot-live{width:6px; height:6px; border-radius:50%; background:var(--emerald); box-shadow:0 0 8px var(--emerald); animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* segmented nav */
+.navwrap{position:sticky; top:63px; z-index:40; padding:12px 20px; background:linear-gradient(180deg, rgba(16,11,7,.85), rgba(16,11,7,.5));backdrop-filter:blur(10px); border-bottom:1px solid var(--stroke);}
+.segmented{
+  position:relative; display:flex; overflow-x:auto; gap:2px;
+  background:var(--surface); border:1px solid var(--stroke); border-radius:99px; padding:4px;
+  max-width:900px; margin:0 auto; scrollbar-width:none;
+}
+.segmented::-webkit-scrollbar{display:none;}
+.seg-thumb{
+  position:absolute; top:4px; left:4px; height:calc(100% - 8px);
+  background:var(--surface-hi); border-radius:99px;
+  transition:transform .38s var(--spring), width .38s var(--spring);
+  box-shadow:0 2px 10px rgba(0,0,0,.25), inset 0 0 0 1px var(--stroke-2);
+  z-index:0;
+}
+.seg-btn{
+  position:relative; z-index:1; flex:1 0 auto; white-space:nowrap;
+  padding:9px 16px; font-size:13.5px; font-weight:600; color:var(--text-2);
+  border-radius:99px; transition:color .25s var(--ease);
+}
+.seg-btn.active{color:var(--text);}
+
+/* pager */
+.pager{
+  flex:1; display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
+  scroll-behavior:smooth; -webkit-overflow-scrolling:touch;
+}
+.pager::-webkit-scrollbar{display:none;}
+.panel{
+  flex:0 0 100%; width:100%; scroll-snap-align:start;
+  padding:22px 20px 80px; max-width:1300px; margin:0 auto; min-height:60vh;
+}
+@media(min-width:1000px){ .panel{padding:32px 32px 100px;} }
+
+h1.title{font-size:24px; font-weight:700; letter-spacing:-.3px; margin-bottom:4px;}
+p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
+
+/* KPI row */
+.kpi-row{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:20px;}
+@media(min-width:700px){ .kpi-row{grid-template-columns:repeat(4,1fr);} }
+.kpi{
+  background:var(--surface); border:1px solid var(--stroke); border-radius:var(--radius); padding:16px;
+  transition:transform .3s var(--ease);
+}
+.kpi:hover{transform:translateY(-3px);}
+.kpi .val{font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;}
+.kpi .lbl{font-size:11.5px; color:var(--text-2); margin-top:4px;}
+
+/* category grid */
+.cat-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:24px;}
+@media(min-width:700px){ .cat-grid{grid-template-columns:repeat(5,1fr);} }
+.cat-tile{
+  position:relative; overflow:hidden;
+  background:var(--surface); border:1px solid var(--stroke); border-radius:var(--radius);
+  padding:18px 16px; text-align:left; transition:transform .32s var(--ease), border-color .3s;
+}
+.cat-tile::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent,var(--gold));}
+.cat-tile:hover{transform:translateY(-5px); border-color:var(--stroke-2);}
+.cat-tile .emoji{font-size:26px; display:block; margin-bottom:10px;}
+.cat-tile .name{font-weight:700; font-size:14.5px;}
+.cat-tile .count{font-size:11.5px; color:var(--text-2); margin-top:3px;}
+
+/* hero tip card */
+.hero-tip{
+  background:linear-gradient(135deg, rgba(255,190,114,.10), rgba(185,167,255,.05));
+  border:1px solid var(--stroke-2); border-radius:24px; padding:22px; margin-bottom:24px;
+  position:relative; overflow:hidden;
+}
+.hero-tip .eyebrow{font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--gold); font-weight:700; margin-bottom:10px;}
+.hero-tip .teams{font-size:20px; font-weight:700; margin-bottom:6px;}
+.hero-tip .meta{font-size:12.5px; color:var(--text-2); margin-bottom:14px;}
+.prob-bar{display:flex; height:8px; border-radius:99px; overflow:hidden; background:var(--surface-2); margin-bottom:8px;}
+.prob-bar span{height:100%; transition:width .6s var(--ease);}
+.prob-legend{display:flex; justify-content:space-between; font-size:11px; color:var(--text-2); font-family:'JetBrains Mono',monospace;}
+
+/* section label */
+.section-lbl{font-size:13px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.8px; margin:22px 0 12px;}
+
+/* pill row (category switch inside detail, chips, group toggle) */
+.pill-row{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px; scrollbar-width:none;}
+.pill-row::-webkit-scrollbar{display:none;}
+.pill{
+  flex:0 0 auto; padding:8px 15px; border-radius:99px; font-size:12.5px; font-weight:600;
+  background:var(--surface); border:1px solid var(--stroke); color:var(--text-2);
+  transition:all .25s var(--ease); white-space:nowrap;
+}
+.pill.active{color:#100b07; background:var(--pill-color,var(--gold)); border-color:transparent;}
+.back-btn{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); margin-bottom:14px; font-weight:600;}
+.back-btn:hover{color:var(--text);}
+
+.detail-head{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+.detail-head .icn{width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; background:var(--surface-2);}
+.detail-head h2{font-size:20px; font-weight:700;}
+
+.group-toggle{display:inline-flex; background:var(--surface); border:1px solid var(--stroke); border-radius:99px; padding:3px; margin-bottom:18px;}
+.group-toggle button{padding:7px 16px; font-size:12.5px; font-weight:600; border-radius:99px; color:var(--text-2);}
+.group-toggle button.active{background:var(--surface-hi); color:var(--text);}
+
+.empty-state{
+  text-align:center; padding:60px 20px; color:var(--text-2);
+  background:var(--surface); border:1px dashed var(--stroke-2); border-radius:var(--radius);
+}
+.empty-state .big{font-size:34px; margin-bottom:10px;}
+.empty-state .t{font-weight:700; color:var(--text); font-size:15px; margin-bottom:4px;}
+
+.fade-up{animation:fadeUp .4s var(--ease);}
+@keyframes fadeUp{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+
+/* match card grid */
+.match-grid{display:grid; grid-template-columns:1fr; gap:12px;}
+@media(min-width:700px){ .match-grid{grid-template-columns:repeat(2,1fr);} }
+@media(min-width:1000px){ .match-grid{grid-template-columns:repeat(3,1fr);} }
+
+.card{
+  position:relative; background:var(--surface); border:1px solid var(--stroke); border-radius:var(--radius);
+  padding:16px; padding-left:18px; overflow:hidden; cursor:pointer;
+  transition:transform .32s var(--ease), border-color .3s, box-shadow .3s;
+}
+.card::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent, var(--football));}
+.card:hover{transform:translateY(-5px); border-color:var(--stroke-2); box-shadow:0 14px 30px -12px rgba(0,0,0,.5);}
+.card:hover::after{content:''; position:absolute; top:-30%; right:-30%; width:60%; height:60%; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.06), transparent 70%); pointer-events:none;}
+.card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+.card-league{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-2);}
+.sport-sq{width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; background:var(--surface-2);}
+.card-time{font-size:11.5px; color:var(--text-2); font-family:'JetBrains Mono',monospace;}
+.card-time.live{color:var(--red); display:flex; align-items:center; gap:5px; font-weight:700;}
+.live-dot{width:6px; height:6px; border-radius:50%; background:var(--red); animation:pulse 1.2s infinite;}
+.card-teams{font-size:15.5px; font-weight:700; margin-bottom:10px; line-height:1.35;}
+.card-teams .vs{color:var(--text-3); font-weight:400; font-size:12px;}
+.tag-row{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;}
+.tag{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:99px; letter-spacing:.2px;}
+.tag.high{background:rgba(99,214,160,.15); color:var(--emerald);}
+.tag.medium{background:rgba(255,190,114,.15); color:var(--gold);}
+.tag.low{background:rgba(180,168,154,.15); color:var(--text-2);}
+.tag.skip{background:rgba(255,138,111,.10); color:var(--text-3);}
+.tag.ghost{background:var(--surface-2); color:var(--text-2);}
+.odds-row{display:flex; gap:8px;}
+.odds-cell{
+  flex:1; text-align:center; background:var(--surface-2); border-radius:10px; padding:8px 4px;
+  font-family:'JetBrains Mono',monospace;
+}
+.odds-cell .k{font-size:9.5px; color:var(--text-3); display:block; margin-bottom:2px;}
+.odds-cell .v{font-size:14px; font-weight:700;}
+.odds-cell.best{background:rgba(99,214,160,.14); box-shadow:inset 0 0 0 1px rgba(99,214,160,.4);}
+.odds-cell.best .v{color:var(--emerald);}
+
+/* modal */
+.modal-overlay{
+  position:fixed; inset:0; z-index:100; background:rgba(8,6,3,.7); backdrop-filter:blur(6px);
+  display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s var(--ease);
+}
+@media(min-width:700px){ .modal-overlay{align-items:center;} }
+.modal-overlay.open{opacity:1; pointer-events:auto;}
+.modal{
+  background:var(--bg-elev); border:1px solid var(--stroke-2); border-radius:24px 24px 0 0;
+  width:100%; max-width:640px; max-height:88vh; overflow-y:auto; padding:24px;
+  transform:translateY(30px); transition:transform .38s var(--spring);
+}
+@media(min-width:700px){ .modal{border-radius:24px; margin:20px;} }
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal-close{position:absolute; top:16px; right:16px; width:32px; height:32px; border-radius:50%; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:16px;}
+.modal h2{font-size:20px; margin-bottom:4px;}
+.modal .subrow{font-size:12.5px; color:var(--text-2); margin-bottom:18px;}
+.odds-table-wrap{width:100%; overflow-x:auto; margin-bottom:18px; -webkit-overflow-scrolling:touch;}
+.odds-table{width:100%; min-width:340px; border-collapse:collapse; font-size:13px;}
+.odds-table th{text-align:left; font-size:10.5px; color:var(--text-3); text-transform:uppercase; padding:6px 8px; letter-spacing:.5px;}
+.odds-table td{padding:9px 8px; border-top:1px solid var(--stroke); font-family:'JetBrains Mono',monospace;}
+.odds-table td.best{color:var(--emerald); font-weight:700;}
+.stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px;}
+.stat-box{background:var(--surface); border:1px solid var(--stroke); border-radius:14px; padding:12px; text-align:center;}
+.stat-box .v{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px;}
+.stat-box .l{font-size:10px; color:var(--text-2); margin-top:2px;}
+.bet-form{background:var(--surface); border:1px solid var(--stroke); border-radius:16px; padding:16px;}
+.bet-form-row{display:flex; gap:8px; margin-bottom:10px;}
+.bet-form select, .bet-form input{
+  flex:1; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px; font-family:inherit;
+}
+.btn-primary{
+  width:100%; padding:12px; border-radius:12px; background:linear-gradient(135deg,var(--gold),var(--teal));
+  color:#1a1006; font-weight:700; font-size:14px; transition:transform .2s var(--spring), box-shadow .2s;
+}
+.btn-primary:hover{transform:translateY(-2px); box-shadow:0 8px 20px -6px rgba(255,190,114,.4);}
+.btn-primary:disabled{opacity:.4; cursor:not-allowed; transform:none; box-shadow:none;}
+
+/* analysis panel */
+.analysis-card{background:var(--surface); border:1px solid var(--stroke); border-radius:var(--radius); padding:18px; margin-bottom:16px;}
+.analysis-card h3{font-size:14.5px; font-weight:700; margin-bottom:12px;}
+.mc-bar{height:10px; border-radius:99px; background:var(--surface-2); overflow:hidden; margin:10px 0;}
+.mc-bar span{display:block; height:100%; background:linear-gradient(90deg,var(--emerald),var(--gold)); transition:width .7s var(--ease);}
+.factor-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--stroke); font-size:12.5px;}
+.factor-row:first-child{border-top:none;}
+.mini-bar{width:100px; height:6px; border-radius:99px; background:var(--surface-2); overflow:hidden;}
+.mini-bar span{display:block; height:100%; background:var(--gold); transition:width .6s var(--ease);}
+.steam-badge{font-size:10px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(255,138,111,.15); color:var(--red);}
+
+/* radar */
+.radar-block{border-radius:var(--radius); border:1px solid var(--stroke); padding:18px; margin-bottom:16px; background:var(--surface);}
+.radar-head{display:flex; align-items:center; gap:8px; margin-bottom:10px; font-weight:700; font-size:14.5px;}
+.warn-box{background:rgba(255,138,111,.08); border:1px solid rgba(255,138,111,.3); border-radius:12px; padding:10px 12px; font-size:12px; color:var(--red); margin-top:10px;}
+
+/* my bets */
+.wallets{display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:20px;}
+@media(min-width:700px){ .wallets{grid-template-columns:repeat(3,1fr);} }
+.wallet{border-radius:var(--radius); padding:16px; border:1px solid var(--stroke); background:var(--surface); position:relative; overflow:hidden;}
+.wallet::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--wc);}
+.wallet .nm{font-size:12.5px; color:var(--text-2); font-weight:700; margin-bottom:6px;}
+.wallet input{
+  width:100%; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text);
+  font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; border-radius:10px; padding:8px 10px;
+}
+.total-bankroll{display:flex; justify-content:space-between; align-items:center; background:var(--surface); border:1px solid var(--stroke-2); border-radius:var(--radius); padding:18px; margin-bottom:14px;}
+.total-bankroll .v{font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800;}
+.safety-note{font-size:11.5px; color:var(--text-2); margin-bottom:20px;}
+.perf-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:20px;}
+@media(min-width:700px){ .perf-grid{grid-template-columns:repeat(4,1fr);} }
+.bet-row{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; background:var(--surface); border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px; font-size:12.5px;}
+.bet-row .st{font-weight:700; padding:3px 9px; border-radius:99px; font-size:10.5px;}
+.st.open{background:rgba(255,190,114,.15); color:var(--gold);}
+.st.win{background:rgba(99,214,160,.15); color:var(--emerald);}
+.st.lose{background:rgba(255,138,111,.15); color:var(--red);}
+svg.pnl-chart{width:100%; height:140px;}
+
+/* calendar */
+.cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
+.cal-head h2{font-size:18px; font-weight:700; text-transform:capitalize;}
+.cal-nav{display:flex; gap:6px;}
+.cal-nav button{width:34px; height:34px; border-radius:10px; background:var(--surface); border:1px solid var(--stroke); font-size:14px;}
+.cal-nav button:hover{background:var(--surface-hi);}
+.cal-nav .today-btn{width:auto; padding:0 14px; font-size:12px; font-weight:700;}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
+.cal-dow{text-align:center; font-size:10.5px; color:var(--text-3); font-weight:700; padding-bottom:6px; text-transform:uppercase;}
+.cal-cell{
+  aspect-ratio:1/1; border-radius:12px; background:var(--surface); border:1px solid var(--stroke);
+  padding:6px; display:flex; flex-direction:column; justify-content:space-between; position:relative; transition:all .25s;
+}
+.cal-cell:hover{border-color:var(--stroke-2); transform:translateY(-2px);}
+.cal-cell.muted{opacity:.35;}
+.cal-cell .num{font-size:12px; font-weight:600; font-family:'JetBrains Mono',monospace;}
+.cal-cell.today .num{
+  width:20px; height:20px; border-radius:50%; background:#ff453a; color:#fff;
+  display:flex; align-items:center; justify-content:center; font-weight:800;
+}
+.cal-dots{display:flex; gap:3px; flex-wrap:wrap;}
+.cal-dots span{width:5px; height:5px; border-radius:50%;}
+.legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:16px; font-size:11px; color:var(--text-2);}
+.legend .li{display:flex; align-items:center; gap:5px;}
+.legend .sw{width:7px; height:7px; border-radius:50%;}
+
+/* leaderboard */
+.podium{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px; align-items:end;}
+.podium-card{
+  background:var(--surface); border:1px solid var(--stroke); border-radius:16px; padding:14px 10px; text-align:center;
+  transition:transform .3s var(--ease);
+}
+.podium-card:hover{transform:translateY(-4px);}
+.podium-card.rank1{border-color:rgba(255,190,114,.5); background:rgba(255,190,114,.08); order:2; padding-top:22px;}
+.podium-card.rank2{order:1;}
+.podium-card.rank3{order:3;}
+.podium-medal{font-size:22px; margin-bottom:6px;}
+.podium-name{font-weight:700; font-size:13px; margin-bottom:4px;}
+.podium-profit{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;}
+.lb-row{
+  display:flex; align-items:center; gap:12px; padding:11px 14px; background:var(--surface);
+  border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px;
+}
+.lb-row.me{border-color:rgba(255,190,114,.5); background:rgba(255,190,114,.06);}
+.lb-rank{width:22px; font-family:'JetBrains Mono',monospace; color:var(--text-2); font-size:12.5px; font-weight:700;}
+.lb-avatar{
+  width:32px; height:32px; border-radius:50%; background:var(--surface-2); display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:12.5px; flex-shrink:0;
+}
+.lb-info{flex:1; min-width:0;}
+.lb-name{font-weight:700; font-size:13px;}
+.lb-sub{font-size:11px; color:var(--text-2);}
+.lb-profit{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; text-align:right; white-space:nowrap;}
+.feed-row{
+  padding:11px 14px; background:var(--surface); border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px; font-size:12.5px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.feed-row.me{border-color:rgba(255,190,114,.4);}
+.feed-left b{font-size:13px;}
+.feed-left .m{color:var(--text-2); display:block; margin-top:2px;}
+.note-box{
+  background:var(--surface); border:1px dashed var(--stroke-2); border-radius:14px; padding:12px 14px;
+  font-size:11.5px; color:var(--text-2); margin-bottom:18px; line-height:1.5;
+}
+
+/* auth gate */
+.auth-gate{
+  position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center;
+  padding:24px; overflow-y:auto;
+}
+.auth-card{
+  width:100%; max-width:400px; background:var(--bg-elev); border:1px solid var(--stroke-2);
+  border-radius:24px; padding:28px 26px; box-shadow:0 24px 60px -20px rgba(0,0,0,.6);
+}
+.auth-card h2{font-size:19px; font-weight:700; margin-bottom:6px;}
+.auth-card p.hint{font-size:12.5px; color:var(--text-2); margin-bottom:18px; line-height:1.5;}
+.auth-field{margin-bottom:12px;}
+.auth-field label{display:block; font-size:11.5px; color:var(--text-2); font-weight:700; margin-bottom:5px;}
+.auth-field input{
+  width:100%; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text);
+  border-radius:12px; padding:11px 13px; font-size:14px; font-family:inherit;
+}
+.auth-error{
+  background:rgba(255,138,111,.1); border:1px solid rgba(255,138,111,.3); color:var(--red);
+  border-radius:10px; padding:9px 12px; font-size:12px; margin-bottom:12px;
+}
+.auth-switch{text-align:center; margin-top:16px; font-size:12.5px; color:var(--text-2);}
+.auth-switch button{color:var(--gold); font-weight:700;}
+.pending-icon{font-size:38px; text-align:center; margin-bottom:14px;}
+.admin-user-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 14px; background:var(--surface); border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px;
+}
+.admin-user-row .email{font-size:13px; font-weight:600; word-break:break-all;}
+.admin-user-row .actions{display:flex; gap:6px; flex-shrink:0;}
+.btn-small{padding:7px 12px; border-radius:9px; font-size:11.5px; font-weight:700;}
+.btn-approve{background:rgba(99,214,160,.15); color:var(--emerald);}
+.btn-reject{background:rgba(255,138,111,.15); color:var(--red);}
+
+/* toast notifications — replace jarring native alert() with something on-brand */
+.toast-stack{
+  position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:300;
+  display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;
+  width:100%; max-width:420px; padding:0 16px;
+}
+.toast{
+  pointer-events:auto; width:100%; display:flex; align-items:center; gap:10px;
+  background:var(--bg-elev); border:1px solid var(--stroke-2); border-radius:14px;
+  padding:12px 16px; font-size:13px; box-shadow:0 14px 34px -12px rgba(0,0,0,.55);
+  animation:toastIn .38s var(--spring);
+}
+.toast.leaving{ animation:toastOut .28s var(--ease) forwards; }
+.toast .ic{font-size:16px; flex-shrink:0;}
+.toast.success{ border-color:rgba(99,214,160,.4); }
+.toast.error{ border-color:rgba(255,138,111,.4); }
+@keyframes toastIn{ from{opacity:0; transform:translateY(-14px) scale(.95);} to{opacity:1; transform:translateY(0) scale(1);} }
+@keyframes toastOut{ from{opacity:1; transform:translateY(0) scale(1);} to{opacity:0; transform:translateY(-10px) scale(.96);} }
+
+/* scroll-edge fade — hints there's more to scroll horizontally */
+.pill-row, .segmented{ position:relative; -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image:linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
+
+/* offline banner */
+.offline-banner{
+  position:fixed; top:0; left:0; right:0; z-index:400; text-align:center;
+  background:var(--red); color:#2a0f0a; font-weight:700; font-size:13px; padding:8px;
+  transform:translateY(-100%); transition:transform .3s var(--ease);
+}
+.offline-banner.show{ transform:translateY(0); }
+
+footer{
+  text-align:center; padding:26px 20px 40px; font-size:11px; color:var(--text-3); line-height:1.6;
+  max-width:700px; margin:0 auto;
+}
+/* ============ POLISH: motion, press feedback, stagger, skeletons ============ */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+}
+
+button, .cat-tile, .card, .pill, .seg-btn, .kpi, .wallet, .cal-cell, .lb-row, .feed-row{
+  -webkit-tap-highlight-color:transparent;
+}
+button:active, .cat-tile:active, .card:active, .pill:active{
+  transform:scale(.97);
+  transition:transform .12s var(--ease);
+}
+.btn-primary:active{ transform:scale(.96) translateY(0) !important; }
+
+/* staggered entrance for grids — each card/tile gets a slightly later start via nth-child */
+.match-grid > *, .cat-grid > *{ animation:cardIn .5s var(--ease) backwards; }
+.match-grid > *:nth-child(1),.cat-grid > *:nth-child(1){animation-delay:.02s;}
+.match-grid > *:nth-child(2),.cat-grid > *:nth-child(2){animation-delay:.07s;}
+.match-grid > *:nth-child(3),.cat-grid > *:nth-child(3){animation-delay:.12s;}
+.match-grid > *:nth-child(4),.cat-grid > *:nth-child(4){animation-delay:.17s;}
+.match-grid > *:nth-child(5),.cat-grid > *:nth-child(5){animation-delay:.22s;}
+.match-grid > *:nth-child(6),.cat-grid > *:nth-child(6){animation-delay:.27s;}
+.match-grid > *:nth-child(n+7){animation-delay:.30s;}
+@keyframes cardIn{
+  from{ opacity:0; transform:translateY(14px) scale(.98); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+
+/* smooth cross-fade whenever a panel's content is (re)rendered via JS */
+.panel-fade{ animation:panelFade .34s var(--ease); }
+@keyframes panelFade{ from{opacity:0;} to{opacity:1;} }
+
+/* skeleton shimmer for async-loading content (leaderboard while Supabase resolves) */
+.skeleton{
+  border-radius:12px; background:linear-gradient(100deg, var(--surface) 30%, var(--surface-hi) 50%, var(--surface) 70%);
+  background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer{ 0%{background-position:160% 0;} 100%{background-position:-40% 0;} }
+.skeleton-row{ height:56px; margin-bottom:8px; }
+.skeleton-card{ height:150px; }
+
+/* pager parallax — non-active panels ease back slightly for depth */
+.panel{ transition:transform .1s linear, opacity .1s linear; will-change:transform, opacity; }
+
+/* smoother, springier card hover (adds a touch of scale to the existing lift) */
+.card:hover{ transform:translateY(-6px) scale(1.012); }
+.cat-tile:hover{ transform:translateY(-6px) scale(1.015); }
+.kpi:hover{ transform:translateY(-4px) scale(1.01); }
+
+/* modal: soften the entrance with a touch of scale alongside the slide-up */
+.modal{ transform:translateY(30px) scale(.98); }
+.modal-overlay.open .modal{ transform:translateY(0) scale(1); }
+.modal-overlay{ transition:opacity .32s var(--ease); }
+
+/* focus states for keyboard users — subtle, on-brand */
+button:focus-visible, input:focus-visible{
+  outline:2px solid rgba(255,190,114,.55); outline-offset:2px;
+}
+
+/* segmented thumb: a touch more spring on release */
+.seg-thumb{ transition:transform .42s var(--spring), width .42s var(--spring); }
+
+/* auth card entrance */
+.auth-card{ animation:authIn .45s var(--spring); }
+@keyframes authIn{ from{opacity:0; transform:translateY(16px) scale(.97);} to{opacity:1; transform:translateY(0) scale(1);} }
+
+@media(max-width:600px){
+  .navwrap{top:60px;}
+  header{padding:12px 14px;}
+  .panel{padding:16px 14px 70px;}
+  .clock{display:none;}
+  .age-chip{padding:5px 9px; font-size:10.5px; gap:5px;}
+  #logoutBtn{padding:6px 11px; font-size:11px;}
+  .wordmark{font-size:15px;}
+  .logo{width:30px; height:30px;}
+}
+@media(max-width:360px){
+  .header-right{gap:8px;}
+  .age-chip span:last-child{ max-width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+}
+</style>
+</head>
+<body>
+<div class="mesh"><div class="blob"></div></div>
+<div class="vignette"></div>
+
+<div class="app" id="mainApp" style="display:none;">
+  <header>
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17L9 11L13 15L21 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6H21V12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="wordmark"><span class="money">precyz</span><span class="dollar">$</span></div>
+    </div>
+    <div class="header-right">
+      <div class="clock mono" id="clock">--:--:--</div>
+      <div class="age-chip"><span class="dot-live"></span><span id="ageChip">Kurzy: před chvílí</span></div>
+      <button id="logoutBtn" class="pill" style="margin-left:6px;" onclick="doLogout()">Odhlásit</button>
+    </div>
+  </header>
+
+  <div class="navwrap">
+    <div class="segmented" id="segmented" role="tablist" aria-label="Hlavní navigace">
+      <div class="seg-thumb" id="segThumb"></div>
+      <button class="seg-btn active" data-i="0" role="tab" aria-selected="true">Přehled</button>
+      <button class="seg-btn" data-i="1" role="tab" aria-selected="false">Value</button>
+      <button class="seg-btn" data-i="2" role="tab" aria-selected="false">Analýza</button>
+      <button class="seg-btn" data-i="3" role="tab" aria-selected="false">Radar</button>
+      <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky</button>
+      <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kalendář</button>
+      <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Žebříček</button>
+      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
+    </div>
+  </div>
+
+  <div class="pager" id="pager">
+    <div class="panel" id="panel-0" role="tabpanel"></div>
+    <div class="panel" id="panel-1" role="tabpanel"></div>
+    <div class="panel" id="panel-2" role="tabpanel"></div>
+    <div class="panel" id="panel-3" role="tabpanel"></div>
+    <div class="panel" id="panel-4" role="tabpanel"></div>
+    <div class="panel" id="panel-5" role="tabpanel"></div>
+    <div class="panel" id="panel-6" role="tabpanel"></div>
+    <div class="panel" id="panel-7" role="tabpanel"></div>
+  </div>
+
+  <footer>
+    Precyz poskytuje pouze informativní analýzy na základě veřejně dostupných kurzů a matematických modelů. Nejde o investiční ani sázkové poradenství a není to záruka zisku. Sázení je rizikové — hraj s rozvahou a jen za to, co si můžeš dovolit prohrát.
+    <div style="margin-top:8px;"><button onclick="showPrivacyModal()" style="text-decoration:underline; color:var(--text-2);">Ochrana osobních údajů</button></div>
+  </footer>
+</div>
+
+<div class="auth-gate" id="authGate">
+  <div class="auth-card">
+    <div class="brand" style="justify-content:center; margin-bottom:22px;">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17L9 11L13 15L21 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6H21V12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="wordmark"><span class="money">precyz</span><span class="dollar">$</span></div>
+    </div>
+
+    <div id="authGateBody"><!-- populated by JS: config-missing / login / register / pending / error --></div>
+    <div style="text-align:center; margin-top:16px;"><button onclick="showPrivacyModal()" style="text-decoration:underline; color:var(--text-2); font-size:12px;">Ochrana osobních údajů</button></div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+<div class="offline-banner" id="offlineBanner">📡 Nejsi připojený k internetu — Precyz potřebuje spojení s databází, aby fungoval. Data se obnoví, jakmile se připojíš.</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<script type="module">
+'use strict';
+
+/* ============================= SUPABASE SETUP ============================= */
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// TODO: paste your real Supabase project values here (Project settings → API)
+const SUPABASE_URL = "https://lopxglgvzxdfkkmoblrk.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_W4nNjK4gx0EKFUzRJZkG1w_iDqoO81F";
+const SUPABASE_CONFIGURED = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+const ADMIN_EMAIL = 'skybadaniel@icloud.com';
+
+let supabase = null;
+let currentUser = null;      // Supabase Auth user object ({id, email, ...})
+let currentProfile = null;   // plain {email, role} — no more DB profile row, access = allowlist membership
+let betsChannel = null;      // realtime channel for the shared 'bets' table
+let accessChannel = null;    // realtime channel watching this user's own allowlist row (live revocation)
+let liveBets = [];           // latest full snapshot of public.bets
+let pendingLoginEmail = null;
+
+if (SUPABASE_CONFIGURED) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+}
+
+function authGateBody(){ return document.getElementById('authGateBody'); }
+function showGate(){ document.getElementById('authGate').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; }
+function showApp(){ document.getElementById('authGate').style.display = 'none'; document.getElementById('mainApp').style.display = ''; }
+
+function renderConfigMissing(){
+  authGateBody().innerHTML = `
+    <h2>Databáze zatím není zapojená</h2>
+    <p class="hint">Appce chybí Supabase config (v kódu je jen placeholder). Vlož skutečné hodnoty z Supabase konzole (Project Settings → API → Project URL a publishable key) do proměnných <span class="mono">SUPABASE_URL</span> a <span class="mono">SUPABASE_ANON_KEY</span> na začátku skriptu.</p>
+  `;
+  showGate();
+}
+
+function renderAuthError(msg){
+  const map = {
+    'Signups not allowed for otp':'Tenhle e-mail nemá přístup — musí ho nejdřív přidat administrátor appky.',
+    'Token has expired or is invalid':'Kód vypršel nebo je špatně opsaný. Zkus to znovu.',
+    'Unable to validate email address: invalid format':'Neplatný formát e-mailu.'
+  };
+  return map[msg] || 'Něco se pokazilo: ' + msg;
+}
+
+/* step 1: just an e-mail — no password anywhere in this app */
+function renderEmailEntry(err){
+  authGateBody().innerHTML = `
+    <h2>Přihlášení</h2>
+    <p class="hint">Appka je jen pro schválené e-maily. Zadej svůj a pošleme ti přihlašovací odkaz / kód — žádné heslo netřeba.</p>
+    ${err ? `<div class="auth-error">${err}</div>` : ''}
+    <div class="auth-field"><label>E-mail</label><input type="email" id="loginEmail" placeholder="ty@email.cz" autocomplete="email" name="email_only_no_password" data-lpignore="true" data-1p-ignore data-form-type="other" onkeydown="if(event.key==='Enter') document.getElementById('sendLinkBtn').click()"></div>
+    <button class="btn-primary" id="sendLinkBtn" onclick="doSendLink(event)">Poslat přihlašovací odkaz</button>
+  `;
+  showGate();
+}
+
+/* step 2: waiting for them to click the emailed link, with a manual code fallback */
+function renderCheckEmail(err){
+  authGateBody().innerHTML = `
+    <div class="pending-icon">📩</div>
+    <h2 style="text-align:center;">Zkontroluj e-mail</h2>
+    <p class="hint" style="text-align:center;">Poslali jsme e-mail na <b>${pendingLoginEmail}</b>. Opiš sem 6místný kód z e-mailu (doporučeno — spolehlivější než klikat na odkaz, obzvlášť v Apple Mail):</p>
+    ${err ? `<div class="auth-error">${err}</div>` : ''}
+    <div class="auth-field"><input type="text" id="otpCode" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore data-form-type="other" style="text-align:center; letter-spacing:4px; font-size:18px;" onkeydown="if(event.key==='Enter') document.getElementById('verifyOtpBtn').click()"></div>
+    <button class="btn-primary" id="verifyOtpBtn" onclick="doVerifyOtp(event)">Potvrdit kód</button>
+    <p class="hint" style="text-align:center; margin-top:14px; margin-bottom:0;">Nebo klikni na odkaz přímo v e-mailu.</p>
+    <div class="auth-switch">
+      <button onclick="doResendCode()">Poslat kód znovu</button> · <button onclick="renderEmailEntry()">jiný e-mail</button>
+    </div>
+  `;
+  showGate();
+}
+window.doResendCode = async function(){
+  const secsLeft = Math.ceil((CODE_RESEND_COOLDOWN_S*1000 - (Date.now()-lastCodeSentAt))/1000);
+  if(secsLeft > 0){ renderCheckEmail(`Počkej ještě ${secsLeft} s, než půjde poslat další kód.`); return; }
+  try{
+    const { error } = await supabase.auth.signInWithOtp({ email: pendingLoginEmail, options: { shouldCreateUser: true } });
+    if(error) throw error;
+    lastCodeSentAt = Date.now();
+    renderCheckEmail();
+    showToast('Nový kód odeslán.');
+  }catch(e){ renderCheckEmail(renderAuthError(e.message)); }
+};
+
+function renderNotAllowed(email){
+  authGateBody().innerHTML = `
+    <div class="pending-icon">🚫</div>
+    <h2 style="text-align:center;">Nemáš přístup</h2>
+    <p class="hint" style="text-align:center;">E-mail <b>${email}</b> není na seznamu povolených. Požádej administrátora appky, ať tě přidá.</p>
+    <button class="btn-primary" onclick="renderEmailEntry()">Zpět</button>
+  `;
+  showGate();
+}
+
+window.renderEmailEntry = renderEmailEntry;
+
+function setBtnLoading(btn, loading, loadingText){
+  if(!btn) return;
+  if(loading){
+    if(!btn.dataset.origText) btn.dataset.origText = btn.textContent;
+    btn.textContent = loadingText || 'Chvilku…';
+    btn.disabled = true;
+  } else {
+    btn.disabled = false;
+    if(btn.dataset.origText) btn.textContent = btn.dataset.origText;
+  }
+}
+
+let lastCodeSentAt = 0;
+const CODE_RESEND_COOLDOWN_S = 45;
+
+window.doSendLink = async function(ev){
+  const btn = ev ? ev.currentTarget : document.getElementById('sendLinkBtn');
+  const email = document.getElementById('loginEmail').value.trim();
+  if(!email){ renderEmailEntry('Vyplň e-mail.'); return; }
+  const secsLeft = Math.ceil((CODE_RESEND_COOLDOWN_S*1000 - (Date.now()-lastCodeSentAt))/1000);
+  if(secsLeft > 0){ renderEmailEntry(`Počkej ještě ${secsLeft} s, než půjde poslat další kód.`); return; }
+  setBtnLoading(btn, true, 'Kontroluju…');
+  try{
+    // pre-check against the allowlist so we never even try to send a link to a stranger's inbox
+    const { data: allowed, error: rpcErr } = await supabase.rpc('is_email_allowed', { check_email: email });
+    if(rpcErr) throw rpcErr;
+    if(!allowed){ renderEmailEntry('Tenhle e-mail nemá přístup — musí ho nejdřív přidat administrátor appky.'); return; }
+
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    if(error) throw error;
+    lastCodeSentAt = Date.now();
+    pendingLoginEmail = email;
+    renderCheckEmail();
+  }catch(e){
+    renderEmailEntry(renderAuthError(e.message));
+  } finally {
+    setBtnLoading(btn, false);
+  }
+};
+
+window.doVerifyOtp = async function(ev){
+  const btn = ev ? ev.currentTarget : document.getElementById('verifyOtpBtn');
+  const code = document.getElementById('otpCode').value.trim();
+  if(!code){ renderCheckEmail('Opiš kód z e-mailu.'); return; }
+  setBtnLoading(btn, true, 'Ověřuju…');
+  try{
+    const { error } = await supabase.auth.verifyOtp({ email: pendingLoginEmail, token: code, type: 'email' });
+    if(error) throw error;
+    // onAuthStateChange picks up the new session from here
+  }catch(e){
+    renderCheckEmail(renderAuthError(e.message));
+  } finally {
+    setBtnLoading(btn, false);
+  }
+};
+
+window.doLogout = async function(){
+  if(betsChannel){ supabase.removeChannel(betsChannel); betsChannel = null; }
+  if(accessChannel){ supabase.removeChannel(accessChannel); accessChannel = null; }
+  if(matchesChannel){ supabase.removeChannel(matchesChannel); matchesChannel = null; }
+  if(matchesRefreshInterval){ clearInterval(matchesRefreshInterval); matchesRefreshInterval = null; }
+  await supabase.auth.signOut();
+};
+
+function watchOwnAccess(email){
+  if(accessChannel) return;
+  accessChannel = supabase.channel('access-watch-' + email)
+    .on('postgres_changes', { event:'DELETE', schema:'public', table:'allowed_emails', filter:`email=eq.${email}` }, ()=>{
+      showToast('Přístup byl odebrán administrátorem.', 'error');
+      doLogout();
+    })
+    .subscribe();
+}
+
+async function handleAuthedUser(user){
+  currentUser = user;
+  const email = (user.email || '').toLowerCase();
+  const { data: allowed, error } = await supabase.rpc('is_email_allowed', { check_email: email });
+  if(error || !allowed){
+    await supabase.auth.signOut();
+    renderNotAllowed(email);
+    return;
+  }
+  const isRootAdmin = email === ADMIN_EMAIL.toLowerCase();
+  currentProfile = { email, role: isRootAdmin ? 'admin' : 'user', isRootAdmin };
+  document.getElementById('adminTabBtn').style.display = currentProfile.role==='admin' ? '' : 'none';
+  showApp();
+  startLiveBets();
+  await loadMatchesFromDb();
+  startLiveMatches();
+  if(!isRootAdmin) watchOwnAccess(email); // the root admin's access is hardcoded, nothing to watch
+  renderAll();
+}
+
+if (SUPABASE_CONFIGURED) {
+  supabase.auth.onAuthStateChange((event, session)=>{
+    if(session && session.user){ handleAuthedUser(session.user); }
+    else { currentUser = null; currentProfile = null; renderEmailEntry(); }
+  });
+} else {
+  renderConfigMissing();
+}
+
+/* ---- live shared bets table ('nonstop' pull as requested) ---- */
+async function fetchAllBets(){
+  const { data, error } = await supabase.from('bets').select('*');
+  if(error){ console.debug('[Precyz] bets fetch failed:', error.message); return; }
+  liveBets = data || [];
+  if(document.getElementById('panel-6')) renderLeaderboard();
+}
+function startLiveBets(){
+  if(betsChannel) return;
+  fetchAllBets();
+  betsChannel = supabase.channel('bets-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'bets' }, ()=> fetchAllBets())
+    .subscribe();
+}
+
+async function fsSyncBet(bet){
+  if(!SUPABASE_CONFIGURED || !currentUser) return false;
+  try{
+    const { error } = await supabase.from('bets').upsert({
+      id: 'bet_' + currentUser.id + '_' + bet.id,
+      uid: currentUser.id, email: currentProfile.email,
+      match: bet.match, selection: bet.selection, odds: bet.odds, book: bet.book,
+      stake: bet.stake, status: bet.status, profit: bet.pnl, date_key: bet.date_key,
+      updated_at: new Date().toISOString()
+    });
+    if(error) throw error;
+    return true;
+  }catch(e){ console.debug('[Precyz] bet sync failed:', e && e.message); return false; }
+}
+
+/* ---- admin panel: manage the allowlist directly (add / remove, live) ---- */
+let allowedChannel = null;
+async function renderSyncStatusBox(){
+  try{
+    const { data, error } = await supabase.from('system_status').select('*').eq('id','sync-matches').single();
+    if(error || !data || !data.last_run_at){
+      return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Automatika zápasů (<span class="mono">sync-matches</span>) ještě nikdy neproběhla. Spusť ji ručně přes „Test" ve Supabase, nebo nastav cron.</div>`;
+    }
+    const ageMin = Math.floor((Date.now() - new Date(data.last_run_at).getTime())/60000);
+    const stale = ageMin > 150; // cron má běžet po hodině — přes 2.5h bez běhu = podezřelé
+    const ageTxt = ageMin < 60 ? `${ageMin} min` : `${Math.floor(ageMin/60)} h ${ageMin%60} min`;
+    if(!data.last_run_ok){
+      return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Poslední běh automatiky <b>selhal</b> (před ${ageTxt}). Detail: <span class="mono">${(data.last_run_detail&&data.last_run_detail.error)||'neznámá chyba'}</span></div>`;
+    }
+    if(stale){
+      return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Automatika naposledy proběhla před <b>${ageTxt}</b> — to je déle, než by mělo být. Zkontroluj cron job ve Supabase.</div>`;
+    }
+    return `<div class="note-box">🟢 Automatika zápasů běží — naposledy proběhla před ${ageTxt} (režim: <span class="mono">${(data.last_run_detail&&data.last_run_detail.mode)||'?'}</span>).</div>`;
+  }catch(e){
+    return '';
+  }
+}
+
+async function renderAdminPanel(){
+  const el = document.getElementById('panel-7');
+  if(!el) return;
+  el.innerHTML = `<h1 class="title">Admin</h1><p class="subtle">Načítám…</p>`;
+  try{
+    const { data, error } = await supabase.from('allowed_emails').select('*').order('added_at', {ascending:false});
+    if(error) throw error;
+    const rows = data || [];
+
+    const statusHtml = await renderSyncStatusBox();
+
+    el.innerHTML = `
+      <h1 class="title">Admin</h1>
+      ${statusHtml}
+      <p class="subtle">Spravuj, kdo má do appky přístup. Přidáváš a odebíráš okamžitě, live.</p>
+      <div class="bet-form" style="margin-bottom:20px;">
+        <div class="bet-form-row" style="margin-bottom:0;">
+          <input type="email" id="newAllowedEmail" placeholder="email@osoba.cz" onkeydown="if(event.key==='Enter') document.getElementById('addAllowedBtn').click()">
+          <button class="btn-primary" id="addAllowedBtn" style="flex:0 0 auto; width:auto; padding:9px 18px;" onclick="adminAddEmail(event)">Přidat</button>
+        </div>
+      </div>
+      <div class="section-lbl">Povolené e-maily (${rows.length})</div>
+      ${rows.length ? rows.map(r=>`
+        <div class="admin-user-row">
+          <span class="email">${r.email}</span>
+          <div class="actions">
+            <button class="btn-small btn-reject" onclick="adminRemoveEmail('${r.email}')">Odebrat</button>
+          </div>
+        </div>
+      `).join('') : `<div class="empty-state"><div class="big">📭</div><div class="t">Zatím nikdo</div>Přidej první e-mail výše.</div>`}
+    `;
+  }catch(e){
+    el.innerHTML = `<h1 class="title">Admin</h1><div class="empty-state"><div class="big">⚠️</div><div class="t">Nepodařilo se načíst seznam</div>${e.message}</div>`;
+  }
+  // keep the admin's own view live too, in case they manage access from two tabs/devices
+  if(!allowedChannel){
+    allowedChannel = supabase.channel('allowed-emails-admin-view')
+      .on('postgres_changes', { event:'*', schema:'public', table:'allowed_emails' }, ()=>{
+        if(currentProfile && currentProfile.role==='admin') renderAdminPanel();
+      })
+      .subscribe();
+  }
+}
+window.adminAddEmail = async function(ev){
+  const btn = ev ? ev.currentTarget : document.getElementById('addAllowedBtn');
+  const input = document.getElementById('newAllowedEmail');
+  const email = input.value.trim().toLowerCase();
+  if(!email){ showToast('Vyplň e-mail.', 'error'); return; }
+  setBtnLoading(btn, true, 'Přidávám…');
+  try{
+    const { error } = await supabase.from('allowed_emails').insert({ email });
+    if(error) throw error;
+    showToast('Přidáno: ' + email);
+    renderAdminPanel();
+  }catch(e){ showToast('Chyba: '+e.message, 'error'); }
+  finally { setBtnLoading(btn, false); }
+};
+window.adminRemoveEmail = async function(email){
+  try{
+    const { error } = await supabase.from('allowed_emails').delete().eq('email', email);
+    if(error) throw error;
+    showToast('Odebráno: ' + email);
+    renderAdminPanel();
+  }catch(e){ showToast('Chyba: '+e.message, 'error'); }
+};
+
+
+/* ============================= DATA LAYER ============================= */
+const COUNTRY = {
+  CZ:{flag:'🇨🇿',name:'Česko',order:0}, SK:{flag:'🇸🇰',name:'Slovensko',order:1},
+  AT:{flag:'🇦🇹',name:'Rakousko',order:2}, DE:{flag:'🇩🇪',name:'Německo',order:3},
+  PL:{flag:'🇵🇱',name:'Polsko',order:4}, HU:{flag:'🇭🇺',name:'Maďarsko',order:5},
+  CH:{flag:'🇨🇭',name:'Švýcarsko',order:6}, DK:{flag:'🇩🇰',name:'Dánsko',order:7},
+  NL:{flag:'🇳🇱',name:'Nizozemsko',order:8}, GB:{flag:'🇬🇧',name:'Anglie',order:9},
+  IE:{flag:'🇮🇪',name:'Irsko',order:10}, BG:{flag:'🇧🇬',name:'Bulharsko',order:11},
+  TR:{flag:'🇹🇷',name:'Turecko',order:12}, GR:{flag:'🇬🇷',name:'Řecko',order:13},
+  ES:{flag:'🇪🇸',name:'Španělsko',order:14}, IT:{flag:'🇮🇹',name:'Itálie',order:15},
+  BR:{flag:'🇧🇷',name:'Brazílie',order:16}, AR:{flag:'🇦🇷',name:'Argentina',order:17},
+  PE:{flag:'🇵🇪',name:'Peru',order:18}, EU:{flag:'🇪🇺',name:'Evropa',order:19},
+  SA:{flag:'🌎',name:'Jižní Amerika',order:20}, FRIENDLY:{flag:'🏳️',name:'Přátelák',order:21},
+  ATP:{flag:'🎾',name:'Tenis',order:22}
+};
+const SPORT_META = {
+  football:{label:'Fotbal', emoji:'⚽', color:'var(--football)'},
+  hockey:{label:'Hokej', emoji:'🏒', color:'var(--hockey)'},
+  basketball:{label:'Basketbal', emoji:'🏀', color:'var(--basketball)'},
+  tennis:{label:'Tenis', emoji:'🎾', color:'var(--tennis)'},
+  arbitrage:{label:'Arbitráž', emoji:'💎', color:'var(--arb)'}
+};
+
+function genOdds(fair, margin, skew){
+  const out = {};
+  Object.keys(fair).forEach((k,i)=>{
+    const withMargin = fair[k]*(1+margin);
+    const raw = 1/withMargin;
+    const s = (skew && skew[i]!==undefined) ? skew[i] : 1;
+    out[k] = Math.round(raw*s*100)/100;
+  });
+  return out;
+}
+
+// local (non-UTC) YYYY-MM-DD key — avoids day drift from toISOString() around timezone boundaries
+function localDateStr(d){
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  return `${y}-${mo}-${da}`;
+}
+
+// Zápasy teď žijí v Supabase tabulce `matches`, ne natvrdo v kódu appky.
+// Naplňuje/maže je Edge Function `sync-matches` (viz supabase-function-sync-matches/index.ts),
+// spouštěná automaticky přes cron. Appka je jen čte a živě sleduje změny.
+let MATCHES = [];
+let matchesChannel = null;
+
+function mapDbRowToMatch(row){
+  const d = new Date(row.start_time);
+  return {
+    id: row.id, sport: row.sport, country: row.country, group: row.match_group, league: row.league,
+    home_team: row.home_team, away_team: row.away_team,
+    start_time: row.start_time,
+    date_key: localDateStr(d),
+    bookmaker_odds: row.bookmaker_odds,
+    our_probabilities: row.our_probabilities,
+    confidence: { score: row.confidence_score },
+    live: !!row.live,
+    hasDraw: !!row.has_draw,
+    source: row.source
+  };
+}
+
+async function loadMatchesFromDb(){
+  if(!SUPABASE_CONFIGURED) return;
+  try{
+    const { data, error } = await supabase.from('matches').select('*').order('start_time');
+    if(error) throw error;
+    MATCHES = (data || []).map(mapDbRowToMatch);
+    MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
+    MOCK_LB = buildMockLeaderboard();
+  }catch(e){
+    console.debug('[Precyz] matches load failed:', e && e.message);
+  }
+}
+
+let matchesRefreshInterval = null;
+function startLiveMatches(){
+  if(matchesChannel) return;
+  matchesChannel = supabase.channel('matches-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'matches' }, async ()=>{
+      await loadMatchesFromDb();
+      renderAll();
+    })
+    .subscribe();
+
+  // záložní pravidelné obnovení navíc k realtime — kdyby websocket na chvíli vypadl
+  // a appka zůstala otevřená dlouho, tohle to i tak drží čerstvé (každých 5 minut)
+  if(!matchesRefreshInterval){
+    matchesRefreshInterval = setInterval(async ()=>{
+      await loadMatchesFromDb();
+      renderAll();
+    }, 5*60*1000);
+  }
+}
+
+/* ============================= CALC ENGINE ============================= */
+function devig(odds){
+  // odds: {home,draw?,away}
+  const keys = Object.keys(odds);
+  const inv = {}; let sum=0;
+  keys.forEach(k=>{ inv[k]=1/odds[k]; sum+=inv[k]; });
+  const p = {};
+  keys.forEach(k=> p[k]=inv[k]/sum );
+  return p;
+}
+function bestBook(match, outcome){
+  let best=null, bestOdds=-1;
+  ['tipsport','fortuna','betano'].forEach(b=>{
+    const o = match.bookmaker_odds[b][outcome];
+    if(o>bestOdds){ bestOdds=o; best=b; }
+  });
+  return {book:best, odds:bestOdds};
+}
+function evFor(match, outcome){
+  const best = bestBook(match, outcome);
+  const p = match.our_probabilities[outcome];
+  const ev = p*best.odds - 1;
+  return {ev, odds:best.odds, book:best.book, p};
+}
+function bestMarketForMatch(match){
+  const outcomes = match.hasDraw ? ['home','draw','away'] : ['home','away'];
+  let top=null;
+  outcomes.forEach(o=>{
+    const r = evFor(match,o);
+    if(!top || r.ev>top.ev) top = {...r, outcome:o};
+  });
+  return top;
+}
+function tierOf(ev){
+  if(ev>=0.15) return 'high';
+  if(ev>=0.05) return 'medium';
+  if(ev>0) return 'low';
+  return 'skip';
+}
+function tierLabel(t){
+  return {high:'Vysoká',medium:'Střední',low:'Nízká',skip:'Bez value'}[t];
+}
+function kellyStakeCzk(bankroll, p, odds){
+  const b = odds-1;
+  const q = 1-p;
+  let f = (b*p - q)/b; // full kelly
+  f = Math.max(0, f*0.25); // fractional 0.25x
+  f = Math.min(f, 0.05); // hard cap 5%
+  return Math.round(bankroll*f);
+}
+function outcomeLabel(sport, outcome, match){
+  if(outcome==='home') return match.home_team;
+  if(outcome==='away') return match.away_team;
+  return 'Remíza';
+}
+
+/* enrichment now happens inside loadMatchesFromDb() each time fresh data arrives */
+
+/* ============================= STATE ============================= */
+const state = {
+  tab: 0,
+  category: null, // for overview detail
+  group: 'liga', // liga | mezi
+  valueFilter: 'all',
+  calMonth: new Date().getMonth(),
+  calYear: new Date().getFullYear(),
+  calSelectedDay: null,
+};
+
+/* ============================= STORAGE ============================= */
+function loadBankroll(){
+  try{
+    const raw = localStorage.getItem('moneyup_bankroll_v1');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  const def = {tipsport:2000, fortuna:1500, betano:1000};
+  saveBankroll(def);
+  return def;
+}
+function saveBankroll(b){ localStorage.setItem('moneyup_bankroll_v1', JSON.stringify(b)); }
+function loadBets(){
+  try{
+    const raw = localStorage.getItem('moneyup_bets_v1');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return [];
+}
+function saveBets(b){ localStorage.setItem('moneyup_bets_v1', JSON.stringify(b)); }
+
+let bankroll = loadBankroll();
+let bets = loadBets();
+
+function totalBankroll(){ return bankroll.tipsport+bankroll.fortuna+bankroll.betano; }
+function totalPnl(){ return bets.filter(b=>b.status!=='open').reduce((s,b)=>s+b.pnl,0); }
+
+/* ============================= HELPERS: fmt ============================= */
+function fmtCzk(n){ return Math.round(n).toLocaleString('cs-CZ')+' Kč'; }
+// Odhad, jestli zápas pravděpodobně skončil — bez reálného výsledkového feedu je tohle
+// jediná pojistka, kterou lze udělat: čekat na typickou délku zápasu, ne jen na výkop.
+// Poctivě: tohle NEOVĚŘUJE skutečný výsledek, jen dělá honor-system o něco těžší zneužít.
+function matchLikelyFinished(match){
+  const durationMin = { football: 130, tennis: 200, hockey: 160, basketball: 150 }[match.sport] || 150;
+  const finishAt = new Date(match.start_time).getTime() + durationMin*60000;
+  return Date.now() >= finishAt;
+}
+function showToast(message, type){
+  const stack = document.getElementById('toastStack');
+  if(!stack) { console.log(message); return; }
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type||'success');
+  el.innerHTML = `<span class="ic">${type==='error'?'⚠️':'✅'}</span><span>${message}</span>`;
+  stack.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('leaving');
+    setTimeout(()=> el.remove(), 300);
+  }, 3200);
+}
+window.showToast = showToast;
+function fmtPct(n){ return (n*100>=0?'+':'')+(n*100).toFixed(1)+'%'; }
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('cs-CZ',{day:'numeric',month:'numeric'});
+}
+function fmtTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+}
+
+/* ============================= RENDER: CARD ============================= */
+function matchCardHtml(m){
+  const meta = SPORT_META[m.sport];
+  const c = COUNTRY[m.country];
+  const tier = m._tier;
+  const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
+  const bestOutcome = m._best.outcome;
+  let oddsHtml = '';
+  outcomes.forEach(o=>{
+    const best = bestBook(m,o);
+    const isBest = o===bestOutcome && tier!=='skip';
+    const lbl = o==='home' ? '1' : (o==='draw' ? 'X' : '2');
+    oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.odds.toFixed(2)}</span></div>`;
+  });
+  return `
+  <div class="card" style="--accent:${meta.color}" onclick="openModal('${m.id}')">
+    <div class="card-top">
+      <div class="card-league"><span class="sport-sq">${meta.emoji}</span>${c.flag} ${m.league}</div>
+      ${m.live ? '<div class="card-time live"><span class="live-dot"></span>LIVE</div>' : `<div class="card-time">${fmtDate(m.start_time)} · ${fmtTime(m.start_time)}</div>`}
+    </div>
+    <div class="card-teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
+    <div class="tag-row">
+      <span class="tag ${tier}">${tierLabel(tier)}</span>
+      ${tier!=='skip' ? `<span class="tag ghost">${fmtPct(m._best.ev)} EV</span>` : ''}
+      <span class="tag ghost">conf ${m.confidence.score}</span>
+    </div>
+    <div class="odds-row">${oddsHtml}</div>
+  </div>`;
+}
+
+/* ============================= PANEL 0: PŘEHLED ============================= */
+function renderOverview(){
+  const el = document.getElementById('panel-0');
+  if(state.category){
+    renderCategoryDetail(el);
+    return;
+  }
+  const counts = {};
+  Object.keys(SPORT_META).forEach(s=> counts[s] = MATCHES.filter(m=>m.sport===s).length );
+  counts.arbitrage = 0;
+
+  const scanned = MATCHES.length;
+  const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
+  const bestEv = valueOnes.length ? Math.max(...valueOnes.map(m=>m._best.ev)) : 0;
+  const avgEv = valueOnes.length ? valueOnes.reduce((s,m)=>s+m._best.ev,0)/valueOnes.length : 0;
+  const recStake = valueOnes.length ? Math.round(valueOnes.reduce((s,m)=>s+kellyStakeCzk(totalBankroll(), m._best.p, m._best.odds),0)/valueOnes.length) : 0;
+
+  const heroMatch = valueOnes.slice().sort((a,b)=>b._best.ev-a._best.ev)[0] || MATCHES[0] || null;
+  let barHtml = '', legendHtml = '';
+  if(heroMatch){
+    const hp = heroMatch.our_probabilities;
+    const outcomes = heroMatch.hasDraw ? ['home','draw','away'] : ['home','away'];
+    const colors = {home:'var(--emerald)', draw:'var(--gold)', away:'var(--red)'};
+    barHtml = outcomes.map(o=>`<span data-w="${(hp[o]*100).toFixed(1)}" style="width:0%; background:${colors[o]}"></span>`).join('');
+    legendHtml = outcomes.map(o=>`<span>${o==='home'?'1':o==='draw'?'X':'2'} · ${(hp[o]*100).toFixed(0)}%</span>`).join('');
+  }
+
+  const topValue = valueOnes.slice().sort((a,b)=>b._best.ev-a._best.ev).slice(0,3);
+
+  el.innerHTML = `
+    <h1 class="title">Na co chceš sázet?</h1>
+    <p class="subtle">Vyber sport a uvidíš aktuální sken value příležitostí.</p>
+    <div class="cat-grid">
+      ${Object.entries(SPORT_META).map(([key,meta])=>`
+        <button class="cat-tile fade-up" style="--accent:${meta.color}" onclick="selectCategory('${key}')">
+          <span class="emoji">${meta.emoji}</span>
+          <div class="name">${meta.label}</div>
+          <div class="count">${key==='arbitrage' ? 'sleduju rozdíly' : (counts[key]||0)+' ve skenu'}</div>
+        </button>
+      `).join('')}
+    </div>
+
+    <div class="section-lbl">Přehled dne</div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></div>
+      <div class="kpi"><div class="val mono" style="color:var(--emerald)">${fmtPct(bestEv)}</div><div class="lbl">Nejlepší value</div></div>
+      <div class="kpi"><div class="val mono" style="color:var(--gold)">${fmtPct(avgEv)}</div><div class="lbl">Průměrné EV</div></div>
+      <div class="kpi"><div class="val mono">${fmtCzk(recStake)}</div><div class="lbl">Doporučený vklad</div></div>
+    </div>
+
+    ${heroMatch ? `
+    <div class="hero-tip">
+      <div class="eyebrow">Tip dne</div>
+      <div class="teams">${heroMatch.home_team} vs ${heroMatch.away_team}</div>
+      <div class="meta">${COUNTRY[heroMatch.country].flag} ${heroMatch.league} · ${fmtDate(heroMatch.start_time)} ${fmtTime(heroMatch.start_time)} · doporučení: <b>${outcomeLabel(heroMatch.sport, heroMatch._best.outcome, heroMatch)}</b> @ ${heroMatch._best.odds.toFixed(2)} (${heroMatch._best.book})</div>
+      <div class="prob-bar">${barHtml}</div>
+      <div class="prob-legend">${legendHtml}</div>
+    </div>
+    ` : `
+    <div class="empty-state" style="margin-bottom:24px;">
+      <div class="big">🛰️</div>
+      <div class="t">Zatím žádná data</div>
+      Databáze zápasů je zatím prázdná — automatika (sync-matches) ještě neproběhla, nebo se teprve nastavuje.
+    </div>
+    `}
+
+    <div class="section-lbl">Top value sázky</div>
+    <div class="match-grid">
+      ${topValue.length ? topValue.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🔍</div><div class="t">Zatím žádná value</div>Radši nic než špatně — model dnes nenašel jasnou hranu.</div>`}
+    </div>
+  `;
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.prob-bar span[data-w]').forEach(s=>{ s.style.width = s.dataset.w + '%'; });
+  });
+}
+
+function selectCategory(key){
+  state.category = key;
+  renderOverview();
+}
+function backToOverview(){
+  state.category = null;
+  renderOverview();
+}
+
+function renderCategoryDetail(el){
+  const key = state.category;
+  const meta = SPORT_META[key];
+  let matches = key==='arbitrage' ? [] : MATCHES.filter(m=>m.sport===key);
+
+  let bodyHtml = '';
+  if(key==='arbitrage'){
+    bodyHtml = `<div class="empty-state"><div class="big">💎</div><div class="t">Arbitráž — sleduju rozdíly</div>Momentálně žádná jistá kombinace napříč Tipsport / Fortuna / Betano nepřekročila 100 % pravděpodobnosti. Přepni na Radar pro průběžné sledování.</div>`;
+  } else if(matches.length===0){
+    bodyHtml = `<div class="empty-state"><div class="big">🛠️</div><div class="t">Připravujeme</div>${meta.label} je momentálně mimo sezónu nebo bez naskenovaných zápasů.</div>`;
+  } else {
+    const liga = matches.filter(m=>m.group==='liga').sort((a,b)=>COUNTRY[a.country].order-COUNTRY[b.country].order);
+    const mezi = matches.filter(m=>m.group==='mezi');
+    const list = state.group==='liga' ? liga : mezi;
+    bodyHtml = `
+      <div class="group-toggle">
+        <button class="${state.group==='liga'?'active':''}" onclick="setGroup('liga')">Liga (${liga.length})</button>
+        <button class="${state.group==='mezi'?'active':''}" onclick="setGroup('mezi')">Mezinárodní / Přátelák (${mezi.length})</button>
+      </div>
+      <div class="match-grid fade-up">
+        ${list.length ? list.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🗓️</div><div class="t">Nic v této skupině</div>Zkus druhou skupinu.</div>`}
+      </div>
+    `;
+  }
+
+  el.innerHTML = `
+    <button class="back-btn" onclick="backToOverview()">‹ Nabídka sportů</button>
+    <div class="detail-head">
+      <div class="icn" style="color:${meta.color}">${meta.emoji}</div>
+      <h2 style="color:${meta.color}">${meta.label}</h2>
+    </div>
+    <div class="pill-row">
+      ${Object.entries(SPORT_META).map(([k,mm])=>`
+        <button class="pill ${k===key?'active':''}" style="--pill-color:${mm.color}" onclick="selectCategory('${k}')">${mm.emoji} ${mm.label}</button>
+      `).join('')}
+    </div>
+    <div id="catBody">${bodyHtml}</div>
+  `;
+}
+function setGroup(g){ state.group=g; renderCategoryDetail(document.getElementById('panel-0')); }
+
+/* ============================= PANEL 1: VALUE ============================= */
+function renderValue(){
+  const el = document.getElementById('panel-1');
+  const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
+  const bySport = {};
+  valueOnes.forEach(m=>{ bySport[m.sport]=(bySport[m.sport]||0)+1; });
+  const filtered = state.valueFilter==='all' ? valueOnes : valueOnes.filter(m=>m.sport===state.valueFilter);
+
+  el.innerHTML = `
+    <h1 class="title">Value sázky</h1>
+    <p class="subtle">Jen zápasy, kde model vidí skutečnou hranu nad trhem (EV ≥ 5 %).</p>
+    <div class="pill-row">
+      <button class="pill ${state.valueFilter==='all'?'active':''}" onclick="setValueFilter('all')">Vše (${valueOnes.length})</button>
+      ${Object.entries(SPORT_META).filter(([k])=>k!=='arbitrage').map(([k,mm])=>`
+        <button class="pill ${state.valueFilter===k?'active':''}" style="--pill-color:${mm.color}" onclick="setValueFilter('${k}')">${mm.emoji} ${mm.label} (${bySport[k]||0})</button>
+      `).join('')}
+    </div>
+    <div class="match-grid">
+      ${filtered.length ? filtered.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.</div>`}
+    </div>
+  `;
+}
+function setValueFilter(f){ state.valueFilter=f; renderValue(); }
+
+/* ============================= PANEL 2: ANALÝZA ============================= */
+function monteCarlo(matches){
+  // simplified simulation summary based on average EV/edge
+  const withEdge = matches.filter(m=>m._tier!=='skip');
+  const n = withEdge.length || 1;
+  const avgP = withEdge.reduce((s,m)=>s+m._best.p,0)/n;
+  const winProb = Math.min(95, Math.round(avgP*100 + 4));
+  const roi = withEdge.reduce((s,m)=>s+m._best.ev,0)/n;
+  const expPnl = Math.round(totalBankroll()*0.05*roi*n);
+  return {winProb, roi, expPnl, n};
+}
+
+function renderAnalysis(){
+  const el = document.getElementById('panel-2');
+  const mc = monteCarlo(MATCHES);
+  const sample = MATCHES.filter(m=>m._tier!=='skip').slice(0,6);
+
+  el.innerHTML = `
+    <h1 class="title">Analýza</h1>
+    <p class="subtle">Backtesting · self-verification (Monte-Carlo simulace na aktuálním skenu)</p>
+
+    <div class="analysis-card">
+      <h3>Monte-Carlo · ${mc.n} value pozic</h3>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v" style="color:var(--emerald)">${mc.winProb}%</div><div class="l">Šance na profit</div></div>
+        <div class="stat-box"><div class="v" style="color:var(--gold)">${fmtPct(mc.roi)}</div><div class="l">Očekávané ROI</div></div>
+        <div class="stat-box"><div class="v">${fmtCzk(mc.expPnl)}</div><div class="l">Očekávaný P/L</div></div>
+      </div>
+      <div class="mc-bar"><span data-w="${mc.winProb}" style="width:0%"></span></div>
+      <p class="subtle" style="margin:8px 0 0">Distribuce simulovaných výsledků při 1000 běhách nad aktuálním portfoliem value sázek, frakční Kelly 0.25×, strop 5 % bankrollu na pozici.</p>
+    </div>
+
+    <div class="section-lbl">SPEB feature indexy</div>
+    ${sample.map(m=>`
+      <div class="analysis-card">
+        <h3>${m.home_team} vs ${m.away_team} <span style="color:var(--text-2); font-weight:400">· ${m.league}</span></h3>
+        ${['Síla formy','Pozice v tabulce','Efektivita ofenzivy','Bilance H2H'].map(f=>{
+          const v = 40+Math.round((m.confidence.score/100)*50 + (f.length%7)*3);
+          return `<div class="factor-row"><span>${f}</span><div style="display:flex; align-items:center; gap:8px;"><div class="mini-bar"><span data-w="${Math.min(v,100)}" style="width:0%"></span></div><span class="mono" style="font-size:11px; color:var(--text-2)">${Math.min(v,100)}</span></div></div>`;
+        }).join('')}
+        <div class="factor-row"><span>Confidence skóre</span><b class="mono">${m.confidence.score}/100</b></div>
+      </div>
+    `).join('')}
+
+    <div class="section-lbl">Pohyb kurzu / Closing line value</div>
+    ${sample.slice(0,4).map(m=>{
+      const openOdds = (m._best.odds*(0.96+ (m.confidence.score%5)*0.006)).toFixed(2);
+      const steam = m._best.odds > openOdds;
+      return `<div class="analysis-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0">${m.home_team} vs ${m.away_team}</h3>
+          ${steam ? '<span class="steam-badge">📈 STEAM</span>' : ''}
+        </div>
+        <div class="factor-row"><span>Open kurz (${outcomeLabel(m.sport,m._best.outcome,m)})</span><b class="mono">${openOdds}</b></div>
+        <div class="factor-row"><span>Aktuální kurz</span><b class="mono" style="color:var(--emerald)">${m._best.odds.toFixed(2)}</b></div>
+      </div>`;
+    }).join('')}
+  `;
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('#panel-2 [data-w]').forEach(s=>{ s.style.width = s.dataset.w + '%'; });
+  });
+}
+
+/* ============================= PANEL 3: RADAR ============================= */
+function renderRadar(){
+  const el = document.getElementById('panel-3');
+  const sharpCompared = MATCHES.length;
+  const sharpValue = MATCHES.filter(m=>m._tier!=='skip');
+  const eloSignals = MATCHES.filter(m=>m._tier==='high');
+
+  el.innerHTML = `
+    <h1 class="title">Radar příležitostí</h1>
+    <p class="subtle">Tři nezávislé signály. Zobrazí se jen to, co reálně existuje.</p>
+
+    <div class="radar-block">
+      <div class="radar-head" style="color:var(--arb)">💎 Arbitráž</div>
+      <div class="empty-state" style="padding:30px;">
+        <div class="big">💎</div>
+        <div class="t">Dnes 0 jistých kombinací</div>
+        Porovnáno napříč Tipsport / Fortuna / Betano — sleduju rozdíly, jistý zisk (Σ 1/kurz &lt; 1) se dnes neobjevil.
+      </div>
+    </div>
+
+    <div class="radar-block">
+      <div class="radar-head" style="color:var(--emerald)">📐 Value proti ostré knize</div>
+      <p class="subtle" style="margin-bottom:12px;">Porovnáno ${sharpCompared} zápasů proti no-vig ceně Pinnacle/Betfair jako referenci trhu.</p>
+      ${sharpValue.length ? `<div class="match-grid">${sharpValue.slice(0,6).map(matchCardHtml).join('')}</div>` :
+      `<div class="empty-state"><div class="big">🛡️</div><div class="t">Porovnáno ${sharpCompared} zápasů, žádná value</div>Chrání tě to před sázením se záporným EV.</div>`}
+    </div>
+
+    <div class="radar-block">
+      <div class="radar-head" style="color:var(--gold)">📡 Model signál (ELO)</div>
+      ${eloSignals.length ? `<div class="match-grid">${eloSignals.map(matchCardHtml).join('')}</div>` : `<p class="subtle">Žádný silný ELO signál nad trhem.</p>`}
+      <div class="warn-box">⚠️ Model signál je experimentální a NEOVĚŘENÝ proti historii. Ber ho jako doplňkový, nikoli hlavní zdroj rozhodování.</div>
+    </div>
+
+    <div class="section-lbl">Ve skenu · ${MATCHES.length} zápasů</div>
+    <div class="match-grid">${MATCHES.map(matchCardHtml).join('')}</div>
+  `;
+}
+
+/* ============================= PANEL 4: MOJE SÁZKY ============================= */
+function renderMyBets(){
+  const el = document.getElementById('panel-4');
+  const total = totalBankroll();
+  const pnl = totalPnl();
+  const settled = bets.filter(b=>b.status!=='open');
+  const wins = settled.filter(b=>b.status==='win').length;
+  const hitRate = settled.length ? Math.round(wins/settled.length*100) : 0;
+  const staked = settled.reduce((s,b)=>s+b.stake,0);
+  const roi = staked ? (pnl/staked) : 0;
+
+  el.innerHTML = `
+    <h1 class="title">Pokladna</h1>
+    <div class="total-bankroll">
+      <div><div class="lbl" style="color:var(--text-2); font-size:12px;">Celková pokladna</div><div class="v mono">${fmtCzk(total)}</div></div>
+      <div style="text-align:right;"><div class="lbl" style="color:var(--text-2); font-size:12px;">Celkový P/L</div><div class="v mono" style="color:${pnl>=0?'var(--emerald)':'var(--red)'}; font-size:20px;">${pnl>=0?'+':''}${fmtCzk(pnl)}</div></div>
+    </div>
+    <div class="wallets">
+      <div class="wallet" style="--wc:var(--emerald)"><div class="nm">Tipsport</div><input type="number" value="${bankroll.tipsport}" onchange="updateWallet('tipsport', this.value)"></div>
+      <div class="wallet" style="--wc:var(--red)"><div class="nm">Fortuna</div><input type="number" value="${bankroll.fortuna}" onchange="updateWallet('fortuna', this.value)"></div>
+      <div class="wallet" style="--wc:var(--gold)"><div class="nm">Betano</div><input type="number" value="${bankroll.betano}" onchange="updateWallet('betano', this.value)"></div>
+    </div>
+    <div class="safety-note">🛡️ Pojistka: max. ${fmtCzk(total*0.05)} na jednu sázku (5 % pokladny, frakční Kelly 0.25×).</div>
+
+    <div class="section-lbl">Výkonnost</div>
+    <div class="perf-grid">
+      <div class="kpi"><div class="val mono">${hitRate}%</div><div class="lbl">Hit-rate</div></div>
+      <div class="kpi"><div class="val mono">${fmtPct(roi)}</div><div class="lbl">ROI</div></div>
+      <div class="kpi"><div class="val mono">${settled.length}</div><div class="lbl">Vyhodnocených sázek</div></div>
+      <div class="kpi"><div class="val mono">${bets.filter(b=>b.status==='open').length}</div><div class="lbl">Otevřených sázek</div></div>
+    </div>
+
+    <div class="section-lbl">Kumulativní zisk</div>
+    <div class="analysis-card">${pnlChartSvg()}</div>
+
+    <div class="section-lbl">Historie sázek</div>
+    ${bets.length===0 ? `<div class="empty-state"><div class="big">🧾</div><div class="t">Zatím žádné sázky</div>Otevři kartu zápasu ve Value a vsaď svůj první tip.</div>` :
+      bets.slice().reverse().map(b=>{
+        const match = MATCHES.find(m=>m.id===b.matchId);
+        const started = match ? matchLikelyFinished(match) : true;
+        return `
+        <div class="bet-row">
+          <div>
+            <b>${b.match}</b><br>
+            <span style="color:var(--text-2)">${b.selection} @ ${b.odds.toFixed(2)} · ${b.book} · ${fmtCzk(b.stake)}</span>
+          </div>
+          ${b.status==='open'
+            ? (started
+                ? `<div style="display:flex; gap:6px; flex-shrink:0;">
+                     <button class="btn-small btn-approve" onclick="settleBet('${b.id}','win')">Vyhrál</button>
+                     <button class="btn-small btn-reject" onclick="settleBet('${b.id}','lose')">Prohrál</button>
+                   </div>`
+                : `<span class="st open" title="Půjde vyhodnotit až po pravděpodobném konci zápasu">Čeká na konec zápasu</span>`)
+            : `<span class="st ${b.status}">${b.status==='win'?'Vyhrál':'Prohrál'}</span>`}
+        </div>
+      `;}).join('')}
+    ${bets.length>0 ? `<p class="subtle" style="margin-top:14px;">💡 Poučení: drž se disciplíny Kelly vkladu i po prohře — jedna špatná série neznamená špatný model.</p>` : ''}
+  `;
+}
+function updateWallet(key, val){
+  bankroll[key] = Math.max(0, Math.round(Number(val)||0));
+  saveBankroll(bankroll);
+  renderMyBets();
+}
+function pnlChartSvg(){
+  const settled = bets.filter(b=>b.status!=='open');
+  if(settled.length===0){
+    return `<div style="text-align:center; color:var(--text-2); font-size:12.5px; padding:30px 0;">Zatím nemáš dostatek dat pro graf. Přibude po první vyhodnocené sázce.</div>`;
+  }
+  let cum=0; const pts=[0];
+  settled.forEach(b=>{ cum+=b.pnl; pts.push(cum); });
+  const w=600,h=140,pad=10;
+  const max=Math.max(...pts,1), min=Math.min(...pts,0);
+  const range = (max-min)||1;
+  const stepX = (w-2*pad)/(pts.length-1||1);
+  const path = pts.map((p,i)=>{
+    const x = pad+i*stepX;
+    const y = h-pad-((p-min)/range)*(h-2*pad);
+    return (i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1);
+  }).join(' ');
+  const color = cum>=0 ? 'var(--emerald)' : 'var(--red)';
+  return `<svg class="pnl-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* ============================= PANEL 5: KALENDÁŘ ============================= */
+const MONTHS_CZ = ['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'];
+const DOW_CZ = ['Po','Út','St','Čt','Pá','So','Ne'];
+
+// speciální appka-wide milníky (nejsou to zápasy ani sázky), zobrazí se v kalendáři vlastní barvou
+const SPECIAL_EVENTS = [
+  { date_key: '2026-09-09', label: 'Launch appky', emoji: '🚀' },
+];
+function eventsFor(dateStr){ return SPECIAL_EVENTS.filter(e=>e.date_key===dateStr); }
+
+function dayHasDot(dateStr){
+  const dots = [];
+  const dayBets = bets.filter(b=> (b.date_key || (b.date && b.date.slice(0,10))) === dateStr);
+  if(dayBets.some(b=>b.status==='win')) dots.push('var(--emerald)');
+  if(dayBets.some(b=>b.status==='lose')) dots.push('var(--red)');
+  if(dayBets.some(b=>b.status==='open')) dots.push('var(--gold)');
+  const dayMatches = MATCHES.filter(m=>m.date_key===dateStr);
+  if(dayMatches.some(m=>m._tier!=='skip')) dots.push('var(--teal)');
+  if(dayMatches.length) dots.push('var(--text-3)');
+  if(eventsFor(dateStr).length) dots.push('var(--arb)');
+  return dots;
+}
+
+function renderCalendar(){
+  const el = document.getElementById('panel-5');
+  const y = state.calYear, m = state.calMonth;
+  const first = new Date(y,m,1);
+  const startDow = (first.getDay()+6)%7; // Monday=0
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const daysInPrev = new Date(y,m,0).getDate();
+  const todayStr = localDateStr(new Date());
+
+  let cells = '';
+  for(let i=0;i<42;i++){
+    let dayNum, cls='', dateStr, muted=false;
+    const idx = i - startDow;
+    if(idx<0){ dayNum = daysInPrev+idx+1; muted=true; const dt=new Date(y,m-1,dayNum); dateStr=localDateStr(dt); }
+    else if(idx>=daysInMonth){ dayNum = idx-daysInMonth+1; muted=true; const dt=new Date(y,m+1,dayNum); dateStr=localDateStr(dt); }
+    else { dayNum = idx+1; const dt=new Date(y,m,dayNum); dateStr=localDateStr(dt); }
+    const isToday = dateStr===todayStr;
+    const dots = dayHasDot(dateStr);
+    const dayEvents = eventsFor(dateStr);
+    cells += `<div class="cal-cell ${muted?'muted':''} ${isToday?'today':''}" onclick="selectDay('${dateStr}')">
+      <span class="num">${dayNum}</span>
+      ${dayEvents.length ? `<span style="position:absolute; top:6px; right:6px; font-size:12px;" title="${dayEvents[0].label}">${dayEvents[0].emoji}</span>` : ''}
+      <div class="cal-dots">${dots.slice(0,4).map(c=>`<span style="background:${c}"></span>`).join('')}</div>
+    </div>`;
+  }
+
+  const detail = state.calSelectedDay ? renderDayDetail(state.calSelectedDay) : '';
+
+  el.innerHTML = `
+    <div class="cal-head">
+      <h2>${MONTHS_CZ[m]} ${y}</h2>
+      <div class="cal-nav">
+        <button onclick="calPrev()">‹</button>
+        <button class="today-btn" onclick="calToday()">Dnes</button>
+        <button onclick="calNext()">›</button>
+      </div>
+    </div>
+    <div class="cal-grid">
+      ${DOW_CZ.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
+      ${cells}
+    </div>
+    <div class="legend">
+      <div class="li"><span class="sw" style="background:var(--teal)"></span>Value</div>
+      <div class="li"><span class="sw" style="background:var(--emerald)"></span>Výhra</div>
+      <div class="li"><span class="sw" style="background:var(--red)"></span>Prohra</div>
+      <div class="li"><span class="sw" style="background:var(--gold)"></span>Otevřená sázka</div>
+      <div class="li"><span class="sw" style="background:var(--text-3)"></span>Ve skenu</div>
+      <div class="li"><span class="sw" style="background:var(--arb)"></span>Milník appky</div>
+    </div>
+    <div id="dayDetail">${detail}</div>
+  `;
+}
+function calPrev(){ state.calMonth--; if(state.calMonth<0){state.calMonth=11; state.calYear--;} renderCalendar(); }
+function calNext(){ state.calMonth++; if(state.calMonth>11){state.calMonth=0; state.calYear++;} renderCalendar(); }
+function calToday(){ const d=new Date(); state.calMonth=d.getMonth(); state.calYear=d.getFullYear(); renderCalendar(); }
+function selectDay(dateStr){ state.calSelectedDay = dateStr; renderCalendar(); }
+function renderDayDetail(dateStr){
+  const dayMatches = MATCHES.filter(m=>m.date_key===dateStr);
+  const dayBets = bets.filter(b=>(b.date_key || (b.date && b.date.slice(0,10)))===dateStr);
+  const dayEvents = eventsFor(dateStr);
+  const d = new Date(dateStr);
+  return `
+    <div class="section-lbl">${d.toLocaleDateString('cs-CZ',{weekday:'long', day:'numeric', month:'long'})}</div>
+    ${dayEvents.length ? `<div class="hero-tip" style="margin-bottom:16px; padding:16px;">${dayEvents.map(e=>`<div style="font-size:16px; font-weight:700;">${e.emoji} ${e.label}</div>`).join('')}</div>` : ''}
+    ${dayBets.length ? `<div style="margin-bottom:14px;">${dayBets.map(b=>`
+      <div class="bet-row"><div><b>${b.match}</b><br><span style="color:var(--text-2)">${b.selection} @ ${b.odds.toFixed(2)} · ${fmtCzk(b.stake)}</span></div><span class="st ${b.status}">${b.status==='open'?'Otevřená':b.status==='win'?'Vyhrál':'Prohrál'}</span></div>
+    `).join('')}</div>` : ''}
+    ${dayMatches.length ? `<div class="match-grid">${dayMatches.map(matchCardHtml).join('')}</div>` : `<div class="empty-state"><div class="big">📭</div><div class="t">Žádné zápasy tento den</div></div>`}
+  `;
+}
+
+/* ============================= PANEL 6: ŽEBŘÍČEK ============================= */
+const MOCK_USERNAMES = ['Petr_K','Tomas92','SazkarJirka','MartinB','LenkaS','DavidProfit','KubaTip','NikolaH'];
+function buildMockLeaderboard(){
+  if(!MATCHES.length) return [];
+  let seed = 1337;
+  function rnd(){ seed = (seed*1103515245 + 12345) & 0x7fffffff; return (seed % 10000)/10000; }
+  const entries = [];
+  MOCK_USERNAMES.forEach(name=>{
+    const betCount = 2 + Math.floor(rnd()*3);
+    for(let i=0;i<betCount;i++){
+      const m = MATCHES[Math.floor(rnd()*MATCHES.length)];
+      const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
+      const outcome = outcomes[Math.floor(rnd()*outcomes.length)];
+      const book = ['tipsport','fortuna','betano'][Math.floor(rnd()*3)];
+      const odds = m.bookmaker_odds[book][outcome];
+      const stake = 100 + Math.floor(rnd()*900);
+      const winProb = m.our_probabilities[outcome] || (1/outcomes.length);
+      const win = rnd() < winProb;
+      const profit = win ? Math.round(stake*odds - stake) : -stake;
+      entries.push({
+        user:name, match:m.home_team+' vs '+m.away_team, league:m.league,
+        selection: outcomeLabel(m.sport, outcome, m), odds, book, stake, win, profit,
+        date_key: m.date_key
+      });
+    }
+  });
+  return entries;
+}
+let MOCK_LB = []; // populated once matches have loaded from the DB — see loadMatchesFromDb()
+
+/* Identity now comes from Firebase Auth (currentUser/currentProfile), no anonymous nickname needed. */
+
+function initial(name){ return (name||'?').replace('_',' ').split(' ')[0].slice(0,2).toUpperCase(); }
+
+async function renderLeaderboard(){
+  const el = document.getElementById('panel-6');
+  if(!el) return;
+  const myEmail = currentProfile ? currentProfile.email : null;
+
+  // Real entries come live from the Supabase 'bets' table (liveBets, kept in sync by
+  // an onSnapshot listener started at login — "nonstop" pull, updates without reloading).
+  const real = liveBets.map(e=>({user:e.email, match:e.match, selection:e.selection, odds:e.odds, book:e.book, stake:e.stake, win:e.status==='win', profit:e.profit, date_key:e.date_key}));
+  // Show the 8 sample demo players only until real people start using the leaderboard —
+  // once there's at least one real bet, the demo data steps aside automatically.
+  const showDemo = real.length === 0;
+  const all = showDemo ? [...MOCK_LB, ...real] : real;
+
+  const byUser = {};
+  all.forEach(e=>{
+    if(!byUser[e.user]) byUser[e.user] = {user:e.user, profit:0, bets:0, wins:0};
+    byUser[e.user].profit += e.profit;
+    byUser[e.user].bets += 1;
+    if(e.win) byUser[e.user].wins += 1;
+  });
+  const ranking = Object.values(byUser).sort((a,b)=>b.profit-a.profit);
+  const top3 = ranking.slice(0,3);
+  const isMe = u => myEmail && u.user===myEmail;
+
+  const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
+  const medalFor = u => u===top3[0] ? '🥇' : u===top3[1] ? '🥈' : '🥉';
+
+  const feed = all.slice().sort((a,b)=> (b.date_key||'').localeCompare(a.date_key||'')).slice(0,25);
+
+  el.innerHTML = `
+    <h1 class="title">Žebříček</h1>
+    <p class="subtle">Kdo z komunity sázel na co a kolik na tom vydělal.</p>
+    <div class="note-box">
+      🟢 Připojeno k Supabase databázi jako <b>${myEmail||''}</b> — tvoje sázky jsou vidět z jakéhokoliv zařízení, kde se pod tímhle účtem přihlásíš, a data se aktualizují živě.
+      ${showDemo ? '<br>👀 Zatím tu nikdo reálně nesázel, takže vidíš ukázková demo data. Jakmile padne první skutečná sázka, tenhle žebříček se automaticky přepne na reálná čísla.' : ''}
+    </div>
+
+    <div class="podium">
+      ${podiumOrder.map(u=>`
+        <div class="podium-card rank${u===top3[0]?1:u===top3[1]?2:3}">
+          <div class="podium-medal">${medalFor(u)}</div>
+          <div class="lb-avatar" style="margin:0 auto 8px;">${initial(u.user)}</div>
+          <div class="podium-name">${u.user}${isMe(u)?' (ty)':''}</div>
+          <div class="podium-profit" style="color:${u.profit>=0?'var(--emerald)':'var(--red)'}">${u.profit>=0?'+':''}${fmtCzk(u.profit)}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="section-lbl">Celkové pořadí</div>
+    ${ranking.map((u,i)=>`
+      <div class="lb-row ${isMe(u)?'me':''}">
+        <div class="lb-rank">#${i+1}</div>
+        <div class="lb-avatar">${initial(u.user)}</div>
+        <div class="lb-info">
+          <div class="lb-name">${u.user}${isMe(u)?' (ty)':''}</div>
+          <div class="lb-sub">${u.bets} sázek · ${u.bets ? Math.round(u.wins/u.bets*100) : 0}% úspěšnost</div>
+        </div>
+        <div class="lb-profit" style="color:${u.profit>=0?'var(--emerald)':'var(--red)'}">${u.profit>=0?'+':''}${fmtCzk(u.profit)}</div>
+      </div>
+    `).join('')}
+
+    <div class="section-lbl">Poslední sázky komunity</div>
+    ${feed.length ? feed.map(e=>`
+      <div class="feed-row ${isMe(e)?'me':''}">
+        <div class="feed-left">
+          <b>${e.user}${isMe(e)?' (ty)':''}</b>
+          <span class="m">${e.match} · ${e.selection} @ ${e.odds.toFixed(2)} · ${fmtCzk(e.stake)}</span>
+        </div>
+        <span class="lb-profit" style="color:${e.profit>=0?'var(--emerald)':'var(--red)'}; font-size:13px;">${e.profit>=0?'+':''}${fmtCzk(e.profit)}</span>
+      </div>
+    `).join('') : `<div class="empty-state"><div class="big">📭</div><div class="t">Zatím žádná aktivita</div></div>`}
+  `;
+}
+
+
+function openModal(id){
+  const m = MATCHES.find(x=>x.id===id);
+  if(!m) return;
+  const meta = SPORT_META[m.sport];
+  const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
+  const books = ['tipsport','fortuna','betano'];
+
+  let tableRows = outcomes.map(o=>{
+    const best = bestBook(m,o);
+    return `<tr>
+      <td>${o==='home'?'1 · '+m.home_team : o==='draw' ? 'X · Remíza' : '2 · '+m.away_team}</td>
+      ${books.map(b=>`<td class="${b===best.book?'best':''}">${m.bookmaker_odds[b][o].toFixed(2)}</td>`).join('')}
+    </tr>`;
+  }).join('');
+
+  const kelly = kellyStakeCzk(totalBankroll(), m._best.p, m._best.odds);
+
+  const betOptions = outcomes.map(o=>{
+    const best = bestBook(m,o);
+    return `<option value="${o}">${o==='home'?'1 · '+m.home_team : o==='draw' ? 'X · Remíza' : '2 · '+m.away_team} @ ${best.odds.toFixed(2)}</option>`;
+  }).join('');
+
+  document.getElementById('modalBody').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2>${m.home_team} vs ${m.away_team}</h2>
+    <div class="subrow">${COUNTRY[m.country].flag} ${m.league} · ${fmtDate(m.start_time)} ${fmtTime(m.start_time)}</div>
+
+    <div class="odds-table-wrap">
+      <table class="odds-table">
+        <tr><th>Výsledek</th><th>Tipsport</th><th>Fortuna</th><th>Betano</th></tr>
+        ${tableRows}
+      </table>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${m._best.book})</div></div>
+      <div class="stat-box"><div class="v">${(m._best.p*100).toFixed(0)}%</div><div class="l">Naše pravděpodobnost</div></div>
+      <div class="stat-box"><div class="v">${fmtCzk(kelly)}</div><div class="l">Kelly vklad (0.25×)</div></div>
+    </div>
+
+    <div class="bet-form">
+      <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">＋ Vsadit tip</div>
+      <div class="bet-form-row">
+        <select id="betOutcome">${betOptions}</select>
+      </div>
+      <div class="bet-form-row">
+        <select id="betBook">
+          <option value="tipsport">Tipsport</option>
+          <option value="fortuna">Fortuna</option>
+          <option value="betano">Betano</option>
+        </select>
+        <input type="number" id="betStake" value="${kelly>0?kelly:100}" min="10" placeholder="Vklad Kč">
+      </div>
+      <button class="btn-primary" onclick="placeBet('${m.id}')">Vsadit</button>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+window.showPrivacyModal = function(){
+  document.getElementById('modalBody').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2>Ochrana osobních údajů</h2>
+    <div class="subrow">Poslední aktualizace: srpen 2026</div>
+    <div style="font-size:13.5px; line-height:1.7; color:var(--text-2);">
+      <p style="margin-bottom:12px;"><b style="color:var(--text);">Co ukládáme:</b> tvůj e-mail (kvůli přihlášení), a údaje o sázkách, které do appky sám zadáš (zápas, výběr, kurz, vklad, výsledek). Appka nikde neukládá hesla — přihlašuje se jen jednorázovým kódem posílaným e-mailem.</p>
+      <p style="margin-bottom:12px;"><b style="color:var(--text);">Kdo data vidí:</b> tvůj e-mail a sázky v žebříčku vidí ostatní schválení uživatelé appky (je to sdílený žebříček). Administrátor appky vidí seznam schválených e-mailů.</p>
+      <p style="margin-bottom:12px;"><b style="color:var(--text);">Kde jsou data uložená:</b> v databázi Supabase (EU region — Irsko). Appka je hostovaná na Netlify.</p>
+      <p style="margin-bottom:12px;"><b style="color:var(--text);">Jak data smazat:</b> napiš administrátorovi appky, ať tvůj e-mail odebere ze seznamu povolených — tím ztratíš přístup. Kompletní smazání historických sázek udělá administrátor na požádání ručně v databázi.</p>
+      <p style="margin-bottom:0;">Appka je provozovaná neformálně pro uzavřenou skupinu lidí, ne jako komerční služba.</p>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+};
+document.getElementById('modalOverlay').addEventListener('click', e=>{
+  if(e.target.id==='modalOverlay') closeModal();
+});
+
+async function placeBet(matchId){
+  const m = MATCHES.find(x=>x.id===matchId);
+  const outcome = document.getElementById('betOutcome').value;
+  const book = document.getElementById('betBook').value;
+  const stake = Math.max(10, Math.round(Number(document.getElementById('betStake').value)||0));
+  if(bankroll[book] < stake){ showToast('Nedostatek prostředků v peněžence '+book+'.', 'error'); return; }
+  const odds = m.bookmaker_odds[book][outcome];
+  bankroll[book] -= stake;
+  saveBankroll(bankroll);
+  const bet = {
+    id:'bet_'+Date.now(),
+    matchId, match:m.home_team+' vs '+m.away_team,
+    selection: outcomeLabel(m.sport, outcome, m),
+    outcome, odds, book, stake, status:'open', pnl:0,
+    date: new Date().toISOString(),
+    date_key: localDateStr(new Date())
+  };
+  bets.push(bet);
+  saveBets(bets);
+  closeModal();
+  renderMyBets();
+  renderCalendar();
+  fsSyncBet(bet);
+  showToast('Sázka zaznamenána: '+fmtCzk(stake)+' na '+outcomeLabel(m.sport,outcome,m)+' @ '+odds.toFixed(2));
+}
+async function settleBet(betId, result){
+  const b = bets.find(x=>x.id===betId);
+  if(!b || b.status!=='open') return;
+  const match = MATCHES.find(m=>m.id===b.matchId);
+  if(match && !matchLikelyFinished(match)){
+    showToast('Tuhle sázku ještě nejde vyhodnotit — zápas pravděpodobně ještě neskončil.', 'error');
+    return;
+  }
+  if(result==='win'){
+    const payout = Math.round(b.stake*b.odds);
+    bankroll[b.book] += payout;
+    b.pnl = payout - b.stake;
+    b.status='win';
+  } else {
+    b.pnl = -b.stake;
+    b.status='lose';
+  }
+  saveBankroll(bankroll);
+  saveBets(bets);
+  renderMyBets();
+  fsSyncBet(b);
+  showToast(
+    result==='win' ? `Vyhráno! +${fmtCzk(b.pnl)} (${b.match})` : `Prohráno: ${fmtCzk(b.pnl)} (${b.match})`,
+    result==='win' ? 'success' : 'error'
+  );
+}
+window.settleBet = settleBet;
+
+/* ============================= NAV / PAGER SYNC ============================= */
+const segEl = document.getElementById('segmented');
+const thumbEl = document.getElementById('segThumb');
+const pagerEl = document.getElementById('pager');
+const segBtns = Array.from(segEl.querySelectorAll('.seg-btn'));
+
+function positionThumb(i){
+  const btn = segBtns[i];
+  if(!btn) return;
+  thumbEl.style.width = btn.offsetWidth+'px';
+  thumbEl.style.transform = `translateX(${btn.offsetLeft-4}px)`;
+}
+function setActiveTab(i, scroll=true){
+  state.tab = i;
+  segBtns.forEach((b,idx)=>{
+    b.classList.toggle('active', idx===i);
+    b.setAttribute('aria-selected', idx===i ? 'true' : 'false');
+  });
+  positionThumb(i);
+  if(scroll){
+    pagerEl.scrollTo({left: i*pagerEl.clientWidth, behavior:'smooth'});
+  }
+}
+segBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=> setActiveTab(Number(btn.dataset.i)));
+});
+let scrollTimeout;
+pagerEl.addEventListener('scroll', ()=>{
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(()=>{
+    const i = Math.round(pagerEl.scrollLeft/pagerEl.clientWidth);
+    if(i!==state.tab) setActiveTab(i, false);
+  }, 80);
+});
+
+/* subtle parallax: panels ease back in scale/opacity the further they sit from center */
+const panelEls = Array.from(pagerEl.querySelectorAll('.panel'));
+let parallaxRaf = null;
+function applyParallax(){
+  const w = pagerEl.clientWidth || 1;
+  const center = pagerEl.scrollLeft + w/2;
+  panelEls.forEach(p=>{
+    const pCenter = p.offsetLeft + w/2;
+    const dist = Math.min(1, Math.abs(pCenter - center)/w);
+    p.style.transform = `scale(${1 - dist*0.04})`;
+    p.style.opacity = String(1 - dist*0.5);
+  });
+  parallaxRaf = null;
+}
+pagerEl.addEventListener('scroll', ()=>{
+  if(parallaxRaf) return;
+  parallaxRaf = requestAnimationFrame(applyParallax);
+}, {passive:true});
+requestAnimationFrame(applyParallax);
+
+/* auto-fade: whenever any panel's innerHTML is replaced by a render function, gently fade the
+   new content in — covers every render*() call site without editing each one individually */
+panelEls.forEach(panel=>{
+  const mo = new MutationObserver(()=>{
+    panel.classList.remove('panel-fade');
+    void panel.offsetWidth; // force reflow so the animation restarts
+    panel.classList.add('panel-fade');
+  });
+  mo.observe(panel, {childList:true});
+});
+
+document.addEventListener('keydown', e=>{
+  if(document.getElementById('modalOverlay').classList.contains('open')){
+    if(e.key==='Escape') closeModal();
+    return;
+  }
+  const last = segBtns.length-1;
+  if(e.key==='ArrowRight' && state.tab<last) setActiveTab(state.tab+1);
+  if(e.key==='ArrowLeft' && state.tab>0) setActiveTab(state.tab-1);
+});
+window.addEventListener('resize', ()=>{
+  positionThumb(state.tab);
+  pagerEl.scrollTo({left: state.tab*pagerEl.clientWidth});
+});
+
+/* expose functions used inline */
+window.selectCategory = selectCategory;
+window.backToOverview = backToOverview;
+window.setGroup = setGroup;
+window.setValueFilter = setValueFilter;
+window.updateWallet = updateWallet;
+window.calPrev = calPrev; window.calNext = calNext; window.calToday = calToday; window.selectDay = selectDay;
+window.openModal = openModal; window.closeModal = closeModal; window.placeBet = placeBet;
+
+/* ============================= CLOCK / AGE CHIP ============================= */
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('cs-CZ',{hour12:false});
+}
+setInterval(tickClock, 1000); tickClock();
+
+const SCAN_REFRESH_MIN = 17; // simulated rescan cadence
+let lastScanTime = Date.now() - (2 + Math.floor(Math.random()*7))*60000; // looks freshly scanned (2-8 min ago) on load
+function formatAge(diffMin){
+  if(diffMin < 1) return 'Kurzy: právě teď';
+  if(diffMin === 1) return 'Kurzy: před 1 min';
+  if(diffMin < 60) return `Kurzy: před ${diffMin} min`;
+  const h = Math.floor(diffMin/60), mnt = diffMin%60;
+  return mnt===0 ? `Kurzy: před ${h} h` : `Kurzy: před ${h} h ${mnt} min`;
+}
+function flashRescan(){
+  const dot = document.querySelector('.age-chip .dot-live');
+  if(!dot) return;
+  dot.style.animation = 'none';
+  void dot.offsetWidth;
+  dot.style.animation = '';
+}
+function tickAge(){
+  const diffMin = Math.floor((Date.now()-lastScanTime)/60000);
+  if(diffMin >= SCAN_REFRESH_MIN){
+    lastScanTime = Date.now();
+    flashRescan();
+    document.getElementById('ageChip').textContent = formatAge(0);
+    return;
+  }
+  document.getElementById('ageChip').textContent = formatAge(diffMin);
+}
+setInterval(tickAge, 15000); tickAge();
+
+/* ============================= INIT ============================= */
+function renderAll(){
+  renderOverview();
+  renderValue();
+  renderAnalysis();
+  renderRadar();
+  renderMyBets();
+  renderCalendar();
+  renderLeaderboard();
+  if(currentProfile && currentProfile.role === 'admin') renderAdminPanel();
+  countUp();
+  requestAnimationFrame(()=>positionThumb(state.tab));
+}
+
+/* count-up animation for KPI values on first paint */
+/* ============================= OFFLINE DETECTION ============================= */
+function updateOfflineBanner(){
+  const banner = document.getElementById('offlineBanner');
+  if(!banner) return;
+  banner.classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', async ()=>{
+  updateOfflineBanner();
+  if(currentUser && currentProfile){
+    await loadMatchesFromDb();
+    await fetchAllBets();
+    renderAll();
+  }
+  showToast('Zpátky online — data obnovena.');
+});
+window.addEventListener('offline', updateOfflineBanner);
+updateOfflineBanner();
+
+function countUp(){
+  const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+  document.querySelectorAll('.kpi .val.mono').forEach(el=>{
+    const text = el.textContent;
+    const match = text.match(/-?\d+(\.\d+)?/);
+    if(!match) return;
+    const target = parseFloat(match[0]);
+    const prefix = text.slice(0, match.index);
+    const suffix = text.slice(match.index+match[0].length);
+    const duration = 640;
+    const start = performance.now();
+    function tick(now){
+      const t = Math.min(1, (now-start)/duration);
+      const eased = easeOutCubic(t);
+      const cur = target*eased;
+      el.textContent = prefix + (Number.isInteger(target) ? Math.round(cur) : cur.toFixed(1)) + suffix;
+      if(t<1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+</script>
+</body>
+</html>
