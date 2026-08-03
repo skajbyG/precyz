@@ -76,7 +76,7 @@ button{font-family:inherit; cursor:pointer; border:none; background:none; color:
 header{
   position:sticky; top:0; z-index:50;
   display:flex; align-items:center; justify-content:space-between;
-  padding:14px 20px;
+  padding:calc(14px + env(safe-area-inset-top)) 20px 14px;
   background:rgba(16,11,7,.72); backdrop-filter:blur(18px) saturate(140%);
   border-bottom:1px solid var(--stroke);
 }
@@ -103,7 +103,7 @@ header{
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 
 /* segmented nav */
-.navwrap{position:sticky; top:63px; z-index:40; padding:12px 20px; background:linear-gradient(180deg, rgba(16,11,7,.85), rgba(16,11,7,.5));backdrop-filter:blur(10px); border-bottom:1px solid var(--stroke);}
+.navwrap{position:sticky; top:calc(63px + env(safe-area-inset-top)); z-index:40; padding:12px 20px; background:linear-gradient(180deg, rgba(16,11,7,.85), rgba(16,11,7,.5));backdrop-filter:blur(10px); border-bottom:1px solid var(--stroke);}
 .segmented{
   position:relative; display:flex; overflow-x:auto; gap:2px;
   background:var(--surface); border:1px solid var(--stroke); border-radius:99px; padding:4px;
@@ -310,7 +310,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .bet-form{background:var(--surface); border:1px solid var(--stroke); border-radius:16px; padding:16px;}
 .bet-form-row{display:flex; gap:8px; margin-bottom:10px;}
 .bet-form select, .bet-form input{
-  flex:1; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text); border-radius:10px; padding:9px 10px; font-size:13px; font-family:inherit;
+  flex:1; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text); border-radius:10px; padding:9px 10px; font-size:16px; font-family:inherit;
 }
 .btn-primary{
   width:100%; padding:12px; border-radius:12px; background:linear-gradient(135deg,var(--gold),var(--teal));
@@ -439,8 +439,14 @@ svg.pnl-chart{width:100%; height:140px;}
 .auth-field label{display:block; font-size:11.5px; color:var(--text-2); font-weight:700; margin-bottom:5px;}
 .auth-field input{
   width:100%; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text);
-  border-radius:12px; padding:11px 13px; font-size:14px; font-family:inherit;
+  border-radius:12px; padding:11px 13px; font-size:16px; font-family:inherit;
 }
+.themed-input{
+  background:var(--surface-2); border:1px solid var(--stroke); color:var(--text);
+  border-radius:10px; padding:10px 12px; font-size:16px; font-family:inherit;
+}
+.themed-input:focus{ outline:none; border-color:var(--gold); }
+.themed-input::placeholder{ color:var(--text-3); }
 .auth-error{
   background:rgba(255,138,111,.1); border:1px solid rgba(255,138,111,.3); color:var(--red);
   border-radius:10px; padding:9px 12px; font-size:12px; margin-bottom:12px;
@@ -454,13 +460,13 @@ svg.pnl-chart{width:100%; height:140px;}
 }
 .admin-user-row .email{font-size:13px; font-weight:600; word-break:break-all;}
 .admin-user-row .actions{display:flex; gap:6px; flex-shrink:0;}
-.btn-small{padding:7px 12px; border-radius:9px; font-size:11.5px; font-weight:700;}
+.btn-small{padding:10px 14px; border-radius:9px; font-size:12.5px; font-weight:700; min-height:38px;}
 .btn-approve{background:rgba(99,214,160,.15); color:var(--emerald);}
 .btn-reject{background:rgba(255,138,111,.15); color:var(--red);}
 
 /* toast notifications — replace jarring native alert() with something on-brand */
 .toast-stack{
-  position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:300;
+  position:fixed; top:calc(16px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:300;
   display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;
   width:100%; max-width:420px; padding:0 16px;
 }
@@ -483,7 +489,8 @@ svg.pnl-chart{width:100%; height:140px;}
 /* offline banner */
 .offline-banner{
   position:fixed; top:0; left:0; right:0; z-index:400; text-align:center;
-  background:var(--red); color:#2a0f0a; font-weight:700; font-size:13px; padding:8px;
+  background:var(--red); color:#2a0f0a; font-weight:700; font-size:13px;
+  padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
   transform:translateY(-100%); transition:transform .3s var(--ease);
 }
 .offline-banner.show{ transform:translateY(0); }
@@ -564,7 +571,7 @@ button:focus-visible, input:focus-visible{
 @keyframes authIn{ from{opacity:0; transform:translateY(16px) scale(.97);} to{opacity:1; transform:translateY(0) scale(1);} }
 
 @media(max-width:600px){
-  .navwrap{top:60px;}
+  .navwrap{top:calc(60px + env(safe-area-inset-top));}
   header{padding:12px 14px;}
   .panel{padding:16px 14px 70px;}
   .clock{display:none;}
@@ -1539,8 +1546,8 @@ function renderValue(){
       `).join('')}
     </div>
     <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
-      <input type="text" id="valueSearchInput" placeholder="🔍 Hledat tým nebo soutěž…" value="${search}" oninput="setValueSearch(this.value)" style="flex:1; min-width:160px;">
-      <select id="valueSortSelect" onchange="setValueSort(this.value)" style="flex:0 0 auto;">
+      <input type="text" id="valueSearchInput" class="themed-input" placeholder="🔍 Hledat tým nebo soutěž…" value="${search}" oninput="setValueSearch(this.value)" style="flex:1; min-width:160px;">
+      <select id="valueSortSelect" class="themed-input" onchange="setValueSort(this.value)" style="flex:0 0 auto;">
         <option value="ev" ${sortKey==='ev'?'selected':''}>Řadit: EV</option>
         <option value="confidence" ${sortKey==='confidence'?'selected':''}>Řadit: Confidence</option>
         <option value="time" ${sortKey==='time'?'selected':''}>Řadit: Výkop</option>
@@ -2481,7 +2488,7 @@ function maybeShowInstallHint(){
   if(!deferredInstallPrompt && !isIOS()) return; // Android/desktop bez podpory instalace — nic neukazovat
   const banner = document.createElement('div');
   banner.id = 'installBanner';
-  banner.style.cssText = 'position:fixed; left:16px; right:16px; bottom:16px; z-index:500; background:var(--surface); border:1px solid var(--stroke-2); border-radius:16px; padding:14px 16px; display:flex; align-items:center; gap:12px; box-shadow:0 12px 32px rgba(0,0,0,.4);';
+  banner.style.cssText = 'position:fixed; left:16px; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:500; background:var(--surface); border:1px solid var(--stroke-2); border-radius:16px; padding:14px 16px; display:flex; align-items:center; gap:12px; box-shadow:0 12px 32px rgba(0,0,0,.4);';
   banner.innerHTML = `
     <div style="font-size:22px;">📲</div>
     <div style="flex:1; font-size:12.5px; color:var(--text-2); line-height:1.4;">
