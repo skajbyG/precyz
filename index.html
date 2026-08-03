@@ -790,6 +790,9 @@ function watchOwnAccess(email){
       if(!allowed){
         showToast('Předplatné vypršelo nebo byl přístup upraven administrátorem.', 'error');
         doLogout();
+      } else {
+        await loadMyAccountInfo();
+        renderMyBets();
       }
     })
     .subscribe();
@@ -811,6 +814,7 @@ async function handleAuthedUser(user){
   startLiveBets();
   await loadMatchesFromDb();
   await loadLastSyncTime();
+  await loadMyAccountInfo();
   startLiveMatches();
   if(!isRootAdmin) watchOwnAccess(email); // the root admin's access is hardcoded, nothing to watch
   renderAll();
@@ -847,10 +851,24 @@ window.closeWelcome = function(){
 };
 
 if (SUPABASE_CONFIGURED) {
+  let authResolved = false;
   supabase.auth.onAuthStateChange((event, session)=>{
+    authResolved = true;
     if(session && session.user){ handleAuthedUser(session.user); }
     else { currentUser = null; currentProfile = null; renderEmailEntry(); }
   });
+  // pojistka: pokud Supabase vůbec neodpoví (výpadek, síť), appka po 12s
+  // přestane tvářit jako "načítá se" a ukáže srozumitelnou hlášku místo věčného ticha
+  setTimeout(()=>{
+    if(authResolved) return;
+    authGateBody().innerHTML = `
+      <div class="pending-icon">⚠️</div>
+      <h2 style="text-align:center;">Appka neodpovídá</h2>
+      <p class="hint" style="text-align:center;">Nepodařilo se spojit s databází — zkontroluj internetové připojení, nebo to za chvíli zkus znovu.</p>
+      <button class="btn-primary" onclick="location.reload()">Obnovit stránku</button>
+    `;
+    showGate();
+  }, 12000);
 } else {
   renderConfigMissing();
 }
@@ -951,6 +969,7 @@ async function renderAdminPanel(){
           </span>
           <div class="actions">
             <button class="btn-small btn-approve" onclick="adminEditEmail('${r.email}', ${r.price_czk||'null'}, ${r.expires_at?`'${r.expires_at}'`:'null'})">Upravit</button>
+            <button class="btn-small" style="background:var(--surface-2); color:var(--text-2);" onclick="copyInvite('${r.email}')">📋 Pozvánka</button>
             <button class="btn-small btn-reject" onclick="adminRemoveEmail('${r.email}')">Odebrat</button>
           </div>
         </div>
@@ -968,6 +987,15 @@ async function renderAdminPanel(){
       .subscribe();
   }
 }
+window.copyInvite = async function(email){
+  const text = `Ahoj! Přidal jsem tě do appky Precyz (sázkařská analytika).\n\nOtevři: https://precyz.netlify.app\nZadej svůj e-mail (${email}) — appka ti pošle přihlašovací kód, žádné heslo netřeba.`;
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('Pozvánka zkopírována do schránky.');
+  }catch(e){
+    showToast('Nepodařilo se zkopírovat — zkus to prosím ručně.', 'error');
+  }
+};
 window.adminEditEmail = function(email, price, expires){
   document.getElementById('newAllowedEmail').value = email;
   document.getElementById('newAllowedPrice').value = price != null ? price : '';
@@ -1148,12 +1176,27 @@ function tierOf(ev){
 function tierLabel(t){
   return {high:'Vysoká',medium:'Střední',low:'Nízká',skip:'Bez value'}[t];
 }
+const KELLY_MODES = {
+  conservative: { frac: 0.15, cap: 0.03, label: 'Opatrný' },
+  standard:     { frac: 0.25, cap: 0.05, label: 'Standardní' },
+  aggressive:   { frac: 0.40, cap: 0.08, label: 'Agresivní' },
+};
+function getKellyMode(){
+  try{ return localStorage.getItem('precyz_kelly_mode_v1') || 'standard'; }catch(e){ return 'standard'; }
+}
+function setKellyMode(mode){
+  if(!KELLY_MODES[mode]) return;
+  try{ localStorage.setItem('precyz_kelly_mode_v1', mode); }catch(e){}
+  renderMyBets();
+}
+window.setKellyMode = setKellyMode;
 function kellyStakeCzk(bankroll, p, odds){
+  const mode = KELLY_MODES[getKellyMode()] || KELLY_MODES.standard;
   const b = odds-1;
   const q = 1-p;
   let f = (b*p - q)/b; // full kelly
-  f = Math.max(0, f*0.25); // fractional 0.25x
-  f = Math.min(f, 0.05); // hard cap 5%
+  f = Math.max(0, f*mode.frac); // frakční Kelly podle zvoleného režimu
+  f = Math.min(f, mode.cap); // strop podle zvoleného režimu
   return Math.round(bankroll*f);
 }
 function outcomeLabel(sport, outcome, match){
@@ -1525,9 +1568,30 @@ function renderMyBets(){
   const hitRate = settled.length ? Math.round(wins/settled.length*100) : 0;
   const staked = settled.reduce((s,b)=>s+b.stake,0);
   const roi = staked ? (pnl/staked) : 0;
+  const kellyMode = getKellyMode();
+  const kellyInfo = KELLY_MODES[kellyMode];
+
+  const accountHtml = (currentProfile && !currentProfile.isRootAdmin) ? `
+    <div class="section-lbl">Tvůj účet</div>
+    <div class="analysis-card" style="margin-bottom:20px;">
+      <div style="font-size:13px; color:var(--text-2); margin-bottom:4px;">${currentProfile.email}</div>
+      ${myAccountRow ? `
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+          ${myAccountRow.price_czk ? `<div><div class="mono" style="font-weight:700; font-size:15px;">${fmtCzk(myAccountRow.price_czk)}</div><div style="font-size:11px; color:var(--text-2);">Předplatné</div></div>` : ''}
+          <div>
+            <div class="mono" style="font-weight:700; font-size:15px; color:${myAccountRow.expires_at && myAccountRow.expires_at < localDateStr(new Date()) ? 'var(--red)' : 'var(--text)'};">
+              ${myAccountRow.expires_at ? new Date(myAccountRow.expires_at).toLocaleDateString('cs-CZ') : 'Bez expirace'}
+            </div>
+            <div style="font-size:11px; color:var(--text-2);">Platnost do</div>
+          </div>
+        </div>
+      ` : `<p class="subtle" style="margin:0;">Bez omezení předplatného.</p>`}
+    </div>
+  ` : '';
 
   el.innerHTML = `
     <h1 class="title">Pokladna</h1>
+    ${accountHtml}
     <div class="total-bankroll">
       <div><div class="lbl" style="color:var(--text-2); font-size:12px;">Celková pokladna</div><div class="v mono">${fmtCzk(total)}</div></div>
       <div style="text-align:right;"><div class="lbl" style="color:var(--text-2); font-size:12px;">Celkový P/L</div><div class="v mono" style="color:${pnl>=0?'var(--emerald)':'var(--red)'}; font-size:20px;">${pnl>=0?'+':''}${fmtCzk(pnl)}</div></div>
@@ -1537,7 +1601,12 @@ function renderMyBets(){
       <div class="wallet" style="--wc:var(--red)"><div class="nm">Fortuna</div><input type="number" value="${bankroll.fortuna}" onchange="updateWallet('fortuna', this.value)"></div>
       <div class="wallet" style="--wc:var(--gold)"><div class="nm">Betano</div><input type="number" value="${bankroll.betano}" onchange="updateWallet('betano', this.value)"></div>
     </div>
-    <div class="safety-note">🛡️ Pojistka: max. ${fmtCzk(total*0.05)} na jednu sázku (5 % pokladny, frakční Kelly 0.25×).</div>
+
+    <div class="section-lbl">Styl sázení</div>
+    <div class="group-toggle" style="margin-bottom:8px;">
+      ${Object.entries(KELLY_MODES).map(([key,m])=>`<button class="${kellyMode===key?'active':''}" onclick="setKellyMode('${key}')">${m.label}</button>`).join('')}
+    </div>
+    <div class="safety-note">🛡️ Pojistka (${kellyInfo.label.toLowerCase()}): max. ${fmtCzk(total*kellyInfo.cap)} na jednu sázku (${Math.round(kellyInfo.cap*100)} % pokladny, frakční Kelly ${kellyInfo.frac}×).</div>
 
     <div class="section-lbl">Výkonnost</div>
     <div class="perf-grid">
@@ -1550,7 +1619,10 @@ function renderMyBets(){
     <div class="section-lbl">Kumulativní zisk</div>
     <div class="analysis-card">${pnlChartSvg()}</div>
 
-    <div class="section-lbl">Historie sázek</div>
+    <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Historie sázek</span>
+      ${bets.length>0 ? `<button class="pill" onclick="exportBetsCsv()" style="text-transform:none; letter-spacing:0;">⬇ Export CSV</button>` : ''}
+    </div>
     ${bets.length===0 ? `<div class="empty-state"><div class="big">🧾</div><div class="t">Zatím žádné sázky</div>Otevři kartu zápasu ve Value a vsaď svůj první tip.</div>` :
       bets.slice().reverse().map(b=>{
         const match = MATCHES.find(m=>m.id===b.matchId);
@@ -1567,13 +1639,48 @@ function renderMyBets(){
                      <button class="btn-small btn-approve" onclick="settleBet('${b.id}','win')">Vyhrál</button>
                      <button class="btn-small btn-reject" onclick="settleBet('${b.id}','lose')">Prohrál</button>
                    </div>`
-                : `<span class="st open" title="Půjde vyhodnotit až po pravděpodobném konci zápasu">Čeká na konec zápasu</span>`)
+                : `<div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                     <span class="st open" title="Půjde vyhodnotit až po pravděpodobném konci zápasu">Čeká na konec</span>
+                     <button class="btn-small btn-reject" onclick="cancelBet('${b.id}')" title="Vrátí vklad a smaže sázku">Zrušit</button>
+                   </div>`)
             : `<span class="st ${b.status}">${b.status==='win'?'Vyhrál':'Prohrál'}</span>`}
         </div>
       `;}).join('')}
     ${bets.length>0 ? `<p class="subtle" style="margin-top:14px;">💡 Poučení: drž se disciplíny Kelly vkladu i po prohře — jedna špatná série neznamená špatný model.</p>` : ''}
   `;
 }
+function exportBetsCsv(){
+  const header = ['Datum','Zápas','Výběr','Kurz','Sázkovka','Vklad','Stav','Zisk/Ztráta'];
+  const rows = bets.map(b=>[
+    (b.date_key || (b.date||'').slice(0,10)),
+    b.match, b.selection, b.odds.toFixed(2), b.book, b.stake,
+    b.status==='open'?'Otevřená':b.status==='win'?'Vyhrál':'Prohrál',
+    b.status==='open' ? '' : b.pnl
+  ]);
+  const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'}); // BOM ať Excel správně čte diakritiku
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `precyz-sazky-${localDateStr(new Date())}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+window.exportBetsCsv = exportBetsCsv;
+async function cancelBet(betId){
+  const b = bets.find(x=>x.id===betId);
+  if(!b || b.status!=='open') return;
+  bankroll[b.book] += b.stake; // vrátit vklad
+  saveBankroll(bankroll);
+  bets = bets.filter(x=>x.id!==betId);
+  saveBets(bets);
+  renderMyBets();
+  renderCalendar();
+  try{
+    await supabase.from('bets').delete().eq('id', 'bet_' + currentUser.id + '_' + betId);
+  }catch(e){ console.debug('[Precyz] failed to remove cancelled bet from shared table:', e && e.message); }
+  showToast('Sázka zrušena, vklad vrácen.');
+}
+window.cancelBet = cancelBet;
 function updateWallet(key, val){
   bankroll[key] = Math.max(0, Math.round(Number(val)||0));
   saveBankroll(bankroll);
@@ -2125,6 +2232,14 @@ function tickClock(){
 setInterval(tickClock, 1000); tickClock();
 
 let lastSyncAt = null; // real timestamp from system_status.last_run_at, null until loaded
+let myAccountRow = null; // own row from allowed_emails: {email, price_czk, expires_at} — null for root admin (no row needed)
+async function loadMyAccountInfo(){
+  if(!currentProfile || currentProfile.isRootAdmin) return;
+  try{
+    const { data, error } = await supabase.from('allowed_emails').select('price_czk, expires_at').eq('email', currentProfile.email).single();
+    if(!error && data) myAccountRow = data;
+  }catch(e){ /* ok to fail silently — account card just won't show details */ }
+}
 async function loadLastSyncTime(){
   try{
     const { data, error } = await supabase.from('system_status').select('last_run_at').eq('id','sync-matches').single();
