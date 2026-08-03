@@ -454,6 +454,7 @@ svg.pnl-chart{width:100%; height:140px;}
 .auth-switch{text-align:center; margin-top:16px; font-size:12.5px; color:var(--text-2);}
 .auth-switch button{color:var(--gold); font-weight:700;}
 .pending-icon{font-size:38px; text-align:center; margin-bottom:14px;}
+@keyframes spin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
 .admin-user-row{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:12px 14px; background:var(--surface); border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px;
@@ -646,7 +647,12 @@ button:focus-visible, input:focus-visible{
       <div class="wordmark"><span class="money">precyz</span><span class="dollar">$</span></div>
     </div>
 
-    <div id="authGateBody"><!-- populated by JS: config-missing / login / register / pending / error --></div>
+    <div id="authGateBody">
+      <div style="text-align:center; padding:20px 0;">
+        <div class="pending-icon" style="animation:spin 1.2s linear infinite; display:inline-block;">⏳</div>
+        <p class="hint" style="margin-top:10px;">Zjišťuju, jestli jsi už přihlášený…</p>
+      </div>
+    </div>
     <div style="text-align:center; margin-top:16px;">
       <button onclick="showHelpModal()" style="text-decoration:underline; color:var(--text-2); font-size:12px;">Jak appka funguje</button>
       &nbsp;·&nbsp;
