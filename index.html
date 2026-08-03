@@ -801,6 +801,7 @@ async function handleAuthedUser(user){
   showApp();
   startLiveBets();
   await loadMatchesFromDb();
+  await loadLastSyncTime();
   startLiveMatches();
   if(!isRootAdmin) watchOwnAccess(email); // the root admin's access is hardcoded, nothing to watch
   renderAll();
@@ -1018,6 +1019,7 @@ function startLiveMatches(){
   matchesChannel = supabase.channel('matches-changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'matches' }, async ()=>{
       await loadMatchesFromDb();
+      await loadLastSyncTime();
       renderAll();
     })
     .subscribe();
@@ -1027,6 +1029,7 @@ function startLiveMatches(){
   if(!matchesRefreshInterval){
     matchesRefreshInterval = setInterval(async ()=>{
       await loadMatchesFromDb();
+      await loadLastSyncTime();
       renderAll();
     }, 5*60*1000);
   }
@@ -2002,8 +2005,14 @@ function tickClock(){
 }
 setInterval(tickClock, 1000); tickClock();
 
-const SCAN_REFRESH_MIN = 17; // simulated rescan cadence
-let lastScanTime = Date.now() - (2 + Math.floor(Math.random()*7))*60000; // looks freshly scanned (2-8 min ago) on load
+let lastSyncAt = null; // real timestamp from system_status.last_run_at, null until loaded
+async function loadLastSyncTime(){
+  try{
+    const { data, error } = await supabase.from('system_status').select('last_run_at').eq('id','sync-matches').single();
+    if(!error && data && data.last_run_at) lastSyncAt = new Date(data.last_run_at).getTime();
+  }catch(e){ /* table might not exist yet, or RLS not satisfied — leave as null, chip shows neutral state */ }
+  tickAge();
+}
 function formatAge(diffMin){
   if(diffMin < 1) return 'Kurzy: právě teď';
   if(diffMin === 1) return 'Kurzy: před 1 min';
@@ -2011,22 +2020,12 @@ function formatAge(diffMin){
   const h = Math.floor(diffMin/60), mnt = diffMin%60;
   return mnt===0 ? `Kurzy: před ${h} h` : `Kurzy: před ${h} h ${mnt} min`;
 }
-function flashRescan(){
-  const dot = document.querySelector('.age-chip .dot-live');
-  if(!dot) return;
-  dot.style.animation = 'none';
-  void dot.offsetWidth;
-  dot.style.animation = '';
-}
 function tickAge(){
-  const diffMin = Math.floor((Date.now()-lastScanTime)/60000);
-  if(diffMin >= SCAN_REFRESH_MIN){
-    lastScanTime = Date.now();
-    flashRescan();
-    document.getElementById('ageChip').textContent = formatAge(0);
-    return;
-  }
-  document.getElementById('ageChip').textContent = formatAge(diffMin);
+  const el = document.getElementById('ageChip');
+  if(!el) return;
+  if(lastSyncAt === null){ el.textContent = 'Kurzy: —'; return; }
+  const diffMin = Math.floor((Date.now()-lastSyncAt)/60000);
+  el.textContent = formatAge(diffMin);
 }
 setInterval(tickAge, 15000); tickAge();
 
@@ -2055,6 +2054,7 @@ window.addEventListener('online', async ()=>{
   updateOfflineBanner();
   if(currentUser && currentProfile){
     await loadMatchesFromDb();
+    await loadLastSyncTime();
     await fetchAllBets();
     renderAll();
   }
