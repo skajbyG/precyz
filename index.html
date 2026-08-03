@@ -120,6 +120,12 @@ header{
   border-radius:99px; transition:color .25s var(--ease);
 }
 .seg-btn.active{color:var(--text);}
+.tab-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:16px; height:16px; padding:0 4px; margin-left:4px;
+  background:#D55E00; color:#fff; font-size:10px; font-weight:700;
+  border-radius:8px; vertical-align:middle;
+}
 
 /* pager */
 .pager{
@@ -563,7 +569,7 @@ button:focus-visible, input:focus-visible{
     <div class="segmented" id="segmented" role="tablist" aria-label="Hlavní navigace">
       <div class="seg-thumb" id="segThumb"></div>
       <button class="seg-btn active" data-i="0" role="tab" aria-selected="true">Přehled</button>
-      <button class="seg-btn" data-i="1" role="tab" aria-selected="false">Value</button>
+      <button class="seg-btn" data-i="1" role="tab" aria-selected="false">Value<span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="2" role="tab" aria-selected="false">Analýza</button>
       <button class="seg-btn" data-i="3" role="tab" aria-selected="false">Radar</button>
       <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky</button>
@@ -896,11 +902,32 @@ async function fsSyncBet(bet){
       uid: currentUser.id, email: currentProfile.email,
       match: bet.match, selection: bet.selection, odds: bet.odds, book: bet.book,
       stake: bet.stake, status: bet.status, profit: bet.pnl, date_key: bet.date_key,
+      closing_odds: bet.closing_odds ?? null,
       updated_at: new Date().toISOString()
     });
     if(error) throw error;
     return true;
   }catch(e){ console.debug('[Precyz] bet sync failed:', e && e.message); return false; }
+}
+// Skutečné sledování closing line: jakmile zápas kopne (jeho čas výkopu uplyne),
+// zaznamenáme, jaký byl na tenhle výběr kurz v tu chvíli — a porovnáme s kurzem,
+// za který appka sázku zapsala. Dokud appka nemá napojený živý kurzový feed,
+// se kurzy samy nehýbou, takže closing = bet odds (CLV 0 %) — poctivě, ne předstíraně.
+function captureClosingOdds(){
+  let changed = false;
+  bets.forEach(b=>{
+    if(b.closing_odds != null) return;
+    const match = MATCHES.find(m=>m.id===b.matchId);
+    if(!match) return; // zápas už zmizel z DB (uklizen po odehrání) — closing zůstane neznámý
+    if(new Date(match.start_time).getTime() > Date.now()) return; // ještě nekoplo se
+    const bookOdds = match.bookmaker_odds && match.bookmaker_odds[b.book];
+    const current = bookOdds ? bookOdds[b.outcome] : null;
+    if(current == null) return;
+    b.closing_odds = current;
+    changed = true;
+    fsSyncBet(b);
+  });
+  if(changed) saveBets(bets);
 }
 
 /* ---- admin panel: manage the allowlist directly (add / remove, live) ---- */
@@ -1095,7 +1122,8 @@ function mapDbRowToMatch(row){
     confidence: { score: row.confidence_score },
     live: !!row.live,
     hasDraw: !!row.has_draw,
-    source: row.source
+    source: row.source,
+    updated_at: row.updated_at
   };
 }
 
@@ -1107,6 +1135,7 @@ async function loadMatchesFromDb(){
     MATCHES = (data || []).map(mapDbRowToMatch);
     MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
     MOCK_LB = buildMockLeaderboard();
+    captureClosingOdds();
   }catch(e){
     console.debug('[Precyz] matches load failed:', e && e.message);
   }
@@ -1213,6 +1242,9 @@ const state = {
   category: null, // for overview detail
   group: 'liga', // liga | mezi
   valueFilter: 'all',
+  valueSearch: '',
+  valueSort: 'ev',
+  lbPeriod: 'all',
   calMonth: new Date().getMonth(),
   calYear: new Date().getFullYear(),
   calSelectedDay: null,
@@ -1439,7 +1471,24 @@ function renderValue(){
   const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
   const bySport = {};
   valueOnes.forEach(m=>{ bySport[m.sport]=(bySport[m.sport]||0)+1; });
-  const filtered = state.valueFilter==='all' ? valueOnes : valueOnes.filter(m=>m.sport===state.valueFilter);
+  let filtered = state.valueFilter==='all' ? valueOnes : valueOnes.filter(m=>m.sport===state.valueFilter);
+
+  const search = (state.valueSearch||'').trim().toLowerCase();
+  if(search){
+    filtered = filtered.filter(m =>
+      m.home_team.toLowerCase().includes(search) ||
+      m.away_team.toLowerCase().includes(search) ||
+      m.league.toLowerCase().includes(search)
+    );
+  }
+
+  const sortKey = state.valueSort || 'ev';
+  filtered = filtered.slice().sort((a,b)=>{
+    if(sortKey==='ev') return b._best.ev - a._best.ev;
+    if(sortKey==='confidence') return b.confidence.score - a.confidence.score;
+    if(sortKey==='time') return new Date(a.start_time) - new Date(b.start_time);
+    return 0;
+  });
 
   el.innerHTML = `
     <h1 class="title">Value sázky</h1>
@@ -1450,12 +1499,38 @@ function renderValue(){
         <button class="pill ${state.valueFilter===k?'active':''}" style="--pill-color:${mm.color}" onclick="setValueFilter('${k}')">${mm.emoji} ${mm.label} (${bySport[k]||0})</button>
       `).join('')}
     </div>
+    <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+      <input type="text" id="valueSearchInput" placeholder="🔍 Hledat tým nebo soutěž…" value="${search}" oninput="setValueSearch(this.value)" style="flex:1; min-width:160px;">
+      <select id="valueSortSelect" onchange="setValueSort(this.value)" style="flex:0 0 auto;">
+        <option value="ev" ${sortKey==='ev'?'selected':''}>Řadit: EV</option>
+        <option value="confidence" ${sortKey==='confidence'?'selected':''}>Řadit: Confidence</option>
+        <option value="time" ${sortKey==='time'?'selected':''}>Řadit: Výkop</option>
+      </select>
+    </div>
     <div class="match-grid">
-      ${filtered.length ? filtered.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.</div>`}
+      ${filtered.length ? filtered.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>${search ? 'Pro tohle hledání nic nenašli.' : 'Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.'}</div>`}
     </div>
   `;
 }
 function setValueFilter(f){ state.valueFilter=f; renderValue(); }
+function setValueSearch(v){
+  state.valueSearch = v;
+  // debounce lehce, ať nepřekresluje input pod prsty při psaní
+  clearTimeout(window._valueSearchTimeout);
+  window._valueSearchTimeout = setTimeout(()=>{
+    const active = document.activeElement && document.activeElement.id==='valueSearchInput';
+    const cursorPos = active ? document.activeElement.selectionStart : null;
+    renderValue();
+    if(active){
+      const input = document.getElementById('valueSearchInput');
+      input.focus();
+      input.setSelectionRange(cursorPos, cursorPos);
+    }
+  }, 150);
+}
+window.setValueSearch = setValueSearch;
+function setValueSort(v){ state.valueSort = v; renderValue(); }
+window.setValueSort = setValueSort;
 
 /* ============================= PANEL 2: ANALÝZA ============================= */
 function monteCarlo(matches){
@@ -1502,18 +1577,24 @@ function renderAnalysis(){
     `).join('')}
 
     <div class="section-lbl">Pohyb kurzu / Closing line value</div>
-    ${sample.slice(0,4).map(m=>{
-      const openOdds = (m._best.odds*(0.96+ (m.confidence.score%5)*0.006)).toFixed(2);
-      const steam = m._best.odds > openOdds;
-      return `<div class="analysis-card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0">${m.home_team} vs ${m.away_team}</h3>
-          ${steam ? '<span class="steam-badge">📈 STEAM</span>' : ''}
-        </div>
-        <div class="factor-row"><span>Open kurz (${outcomeLabel(m.sport,m._best.outcome,m)})</span><b class="mono">${openOdds}</b></div>
-        <div class="factor-row"><span>Aktuální kurz</span><b class="mono" style="color:var(--emerald)">${m._best.odds.toFixed(2)}</b></div>
-      </div>`;
-    }).join('')}
+    ${(() => {
+      const tracked = bets.filter(b => b.matchId).slice().reverse().slice(0,6);
+      if(!tracked.length) return `<div class="empty-state"><div class="big">📉</div><div class="t">Zatím nic k porovnání</div>Jakmile vsadíš, appka si zaznamená kurz v okamžiku sázky a po výkopu ho porovná se skutečným kurzem — ne s vymyšleným číslem.</div>`;
+      return tracked.map(b=>{
+        const hasClosing = b.closing_odds != null;
+        const clv = hasClosing ? ((b.closing_odds / b.odds) - 1) * 100 : null;
+        const beat = hasClosing && b.closing_odds > b.odds; // kurz se posunul výš = appka chytla lepší cenu, než byla na konci
+        return `<div class="analysis-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0">${b.match}</h3>
+            ${hasClosing ? `<span class="steam-badge" style="background:${beat?'rgba(0,158,115,.15)':'rgba(213,94,0,.15)'}; color:${beat?'#009E73':'#D55E00'};">${beat?'📈':'📉'} CLV ${clv>=0?'+':''}${clv.toFixed(1)}%</span>` : '<span class="st open">Čeká na výkop</span>'}
+          </div>
+          <div class="factor-row"><span>Kurz při sázce (${b.selection})</span><b class="mono">${b.odds.toFixed(2)}</b></div>
+          <div class="factor-row"><span>Kurz při výkopu</span><b class="mono" style="color:${hasClosing?'var(--text)':'var(--text-3)'}">${hasClosing ? b.closing_odds.toFixed(2) : '—'}</b></div>
+        </div>`;
+      }).join('');
+    })()}
+    <p class="subtle" style="margin-top:8px;">💡 Appka zatím nemá napojený živý kurzový feed — dokud se nenapojí, kurz při výkopu bude většinou stejný jako kurz při sázce (appka nemá odkud vzít pohyb, který sama nevidí).</p>
   `;
   requestAnimationFrame(()=>{
     document.querySelectorAll('#panel-2 [data-w]').forEach(s=>{ s.style.width = s.dataset.w + '%'; });
@@ -1721,13 +1802,13 @@ function eventsFor(dateStr){ return SPECIAL_EVENTS.filter(e=>e.date_key===dateSt
 function dayHasDot(dateStr){
   const dots = [];
   const dayBets = bets.filter(b=> (b.date_key || (b.date && b.date.slice(0,10))) === dateStr);
-  if(dayBets.some(b=>b.status==='win')) dots.push('var(--emerald)');
-  if(dayBets.some(b=>b.status==='lose')) dots.push('var(--red)');
-  if(dayBets.some(b=>b.status==='open')) dots.push('#ffd23f');
+  if(dayBets.some(b=>b.status==='win')) dots.push('#009E73');  // bluish green
+  if(dayBets.some(b=>b.status==='lose')) dots.push('#D55E00'); // vermillion — distinguishable from green even for red-green colorblindness
+  if(dayBets.some(b=>b.status==='open')) dots.push('#F0E442'); // yellow
   const dayMatches = MATCHES.filter(m=>m.date_key===dateStr);
-  if(dayMatches.some(m=>m._tier!=='skip')) dots.push('var(--gold)');
-  if(dayMatches.length) dots.push('#8b5cf6');
-  if(eventsFor(dateStr).length) dots.push('var(--arb)');
+  if(dayMatches.some(m=>m._tier!=='skip')) dots.push('#0072B2'); // blue
+  if(dayMatches.length) dots.push('#CC79A7'); // reddish purple
+  if(eventsFor(dateStr).length) dots.push('#E69F00'); // orange
   return dots;
 }
 
@@ -1814,12 +1895,12 @@ function renderCalendar(){
       ${cells}
     </div>
     <div class="legend">
-      <div class="li"><span class="sw" style="background:var(--gold)"></span>Value</div>
-      <div class="li"><span class="sw" style="background:var(--emerald)"></span>Výhra</div>
-      <div class="li"><span class="sw" style="background:var(--red)"></span>Prohra</div>
-      <div class="li"><span class="sw" style="background:#ffd23f"></span>Otevřená sázka</div>
-      <div class="li"><span class="sw" style="background:#8b5cf6"></span>Ve skenu</div>
-      <div class="li"><span class="sw" style="background:var(--arb)"></span>Milník appky</div>
+      <div class="li"><span class="sw" style="background:#0072B2"></span>Value</div>
+      <div class="li"><span class="sw" style="background:#009E73"></span>Výhra</div>
+      <div class="li"><span class="sw" style="background:#D55E00"></span>Prohra</div>
+      <div class="li"><span class="sw" style="background:#F0E442"></span>Otevřená sázka</div>
+      <div class="li"><span class="sw" style="background:#CC79A7"></span>Ve skenu</div>
+      <div class="li"><span class="sw" style="background:#E69F00"></span>Milník appky</div>
     </div>
     <div id="dayDetail">${detail}</div>
   `;
@@ -1884,6 +1965,8 @@ let MOCK_LB = []; // populated once matches have loaded from the DB — see load
 
 function initial(name){ return (name||'?').replace('_',' ').split(' ')[0].slice(0,2).toUpperCase(); }
 
+function setLbPeriod(p){ state.lbPeriod = p; renderLeaderboard(); }
+window.setLbPeriod = setLbPeriod;
 async function renderLeaderboard(){
   const el = document.getElementById('panel-6');
   if(!el) return;
@@ -1895,7 +1978,11 @@ async function renderLeaderboard(){
   // Show the 8 sample demo players only until real people start using the leaderboard —
   // once there's at least one real bet, the demo data steps aside automatically.
   const showDemo = real.length === 0;
-  const all = showDemo ? [...MOCK_LB, ...real] : real;
+  const allUnfiltered = showDemo ? [...MOCK_LB, ...real] : real;
+
+  const lbPeriod = state.lbPeriod || 'all';
+  const monthPrefix = localDateStr(new Date()).slice(0,7); // "YYYY-MM"
+  const all = lbPeriod==='month' ? allUnfiltered.filter(e => (e.date_key||'').startsWith(monthPrefix)) : allUnfiltered;
 
   const byUser = {};
   all.forEach(e=>{
@@ -1916,6 +2003,10 @@ async function renderLeaderboard(){
   el.innerHTML = `
     <h1 class="title">Žebříček</h1>
     <p class="subtle">Kdo z komunity sázel na co a kolik na tom vydělal.</p>
+    <div class="group-toggle" style="margin-bottom:14px;">
+      <button class="${lbPeriod==='all'?'active':''}" onclick="setLbPeriod('all')">Od začátku</button>
+      <button class="${lbPeriod==='month'?'active':''}" onclick="setLbPeriod('month')">Tento měsíc</button>
+    </div>
     <div class="note-box">
       🟢 Připojeno k Supabase databázi jako <b>${myEmail||''}</b> — tvoje sázky jsou vidět z jakéhokoliv zařízení, kde se pod tímhle účtem přihlásíš, a data se aktualizují živě.
       ${showDemo ? '<br>👀 Zatím tu nikdo reálně nesázel, takže vidíš ukázková demo data. Jakmile padne první skutečná sázka, tenhle žebříček se automaticky přepne na reálná čísla.' : ''}
@@ -2154,6 +2245,7 @@ function setActiveTab(i, scroll=true){
     b.setAttribute('aria-selected', idx===i ? 'true' : 'false');
   });
   positionThumb(i);
+  if(i===1) markValueSeen();
   if(scroll){
     pagerEl.scrollTo({left: i*pagerEl.clientWidth, behavior:'smooth'});
   }
@@ -2280,7 +2372,25 @@ function renderAll(){
   renderLeaderboard();
   if(currentProfile && currentProfile.role === 'admin') renderAdminPanel();
   countUp();
+  updateValueBadge();
   requestAnimationFrame(()=>positionThumb(state.tab));
+}
+function updateValueBadge(){
+  const badge = document.getElementById('valueBadge');
+  if(!badge) return;
+  let lastSeen = 0;
+  try{ lastSeen = Number(localStorage.getItem('precyz_value_lastseen_v1') || 0); }catch(e){}
+  const newCount = MATCHES.filter(m => m._tier!=='skip' && m.updated_at && new Date(m.updated_at).getTime() > lastSeen).length;
+  if(newCount > 0){
+    badge.textContent = newCount > 9 ? '9+' : String(newCount);
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+function markValueSeen(){
+  try{ localStorage.setItem('precyz_value_lastseen_v1', String(Date.now())); }catch(e){}
+  updateValueBadge();
 }
 
 /* count-up animation for KPI values on first paint */
