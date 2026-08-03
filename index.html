@@ -814,7 +814,37 @@ async function handleAuthedUser(user){
   startLiveMatches();
   if(!isRootAdmin) watchOwnAccess(email); // the root admin's access is hardcoded, nothing to watch
   renderAll();
+  maybeShowWelcome();
 }
+function maybeShowWelcome(){
+  try{
+    if(localStorage.getItem('precyz_welcomed_v1')) return;
+  }catch(e){ return; }
+  setTimeout(()=>{
+    document.getElementById('modalBody').innerHTML = `
+      <button class="modal-close" onclick="closeWelcome()">✕</button>
+      <div style="text-align:center; margin-bottom:6px;">
+        <div class="logo" style="margin:0 auto 14px; width:48px; height:48px;">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17L9 11L13 15L21 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6H21V12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <h2 style="text-align:center;">Vítej v Precyz</h2>
+      <p class="hint" style="text-align:center; margin-bottom:16px;">Hledá value sázky — zápasy, kde model vidí vyšší pravděpodobnost výsledku, než naznačuje kurz. Negarantuje výhru. Radši nic než špatně.</p>
+      <div style="font-size:13px; line-height:1.7; color:var(--text-2); margin-bottom:18px;">
+        <p style="margin-bottom:6px;">📊 <b style="color:var(--text);">Přehled</b> — vyber sport, uvidíš zápasy</p>
+        <p style="margin-bottom:6px;">💰 <b style="color:var(--text);">Value</b> — jen skutečné příležitosti</p>
+        <p style="margin-bottom:6px;">💳 <b style="color:var(--text);">Moje sázky</b> — tvoje pokladna, s vestavěnou pojistkou</p>
+        <p>Kdykoliv se ztratíš, klikni na <b style="color:var(--text);">„?"</b> v hlavičce.</p>
+      </div>
+      <button class="btn-primary" onclick="closeWelcome()">Jdeme na to</button>
+    `;
+    document.getElementById('modalOverlay').classList.add('open');
+  }, 400);
+}
+window.closeWelcome = function(){
+  closeModal();
+  try{ localStorage.setItem('precyz_welcomed_v1','1'); }catch(e){}
+};
 
 if (SUPABASE_CONFIGURED) {
   supabase.auth.onAuthStateChange((event, session)=>{
@@ -2111,10 +2141,16 @@ function formatAge(diffMin){
 }
 function tickAge(){
   const el = document.getElementById('ageChip');
+  const dot = document.querySelector('.age-chip .dot-live');
   if(!el) return;
   if(lastSyncAt === null){ el.textContent = 'Kurzy: —'; return; }
   const diffMin = Math.floor((Date.now()-lastSyncAt)/60000);
   el.textContent = formatAge(diffMin);
+  // cron má běžet po hodině — přes 3h bez běhu je vidět i pro běžného uživatele,
+  // ne jen v admin panelu
+  const stale = diffMin > 180;
+  el.style.color = stale ? 'var(--red)' : '';
+  if(dot) dot.style.background = stale ? 'var(--red)' : 'var(--emerald)';
 }
 setInterval(tickAge, 15000); tickAge();
 
