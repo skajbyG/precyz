@@ -552,6 +552,7 @@ button:focus-visible, input:focus-visible{
     <div class="header-right">
       <div class="clock mono" id="clock">--:--:--</div>
       <div class="age-chip"><span class="dot-live"></span><span id="ageChip">Kurzy: před chvílí</span></div>
+      <button class="pill" style="margin-left:6px;" onclick="showHelpModal()" title="Nápověda">?</button>
       <button id="logoutBtn" class="pill" style="margin-left:6px;" onclick="doLogout()">Odhlásit</button>
     </div>
   </header>
@@ -597,7 +598,11 @@ button:focus-visible, input:focus-visible{
     </div>
 
     <div id="authGateBody"><!-- populated by JS: config-missing / login / register / pending / error --></div>
-    <div style="text-align:center; margin-top:16px;"><button onclick="showPrivacyModal()" style="text-decoration:underline; color:var(--text-2); font-size:12px;">Ochrana osobních údajů</button></div>
+    <div style="text-align:center; margin-top:16px;">
+      <button onclick="showHelpModal()" style="text-decoration:underline; color:var(--text-2); font-size:12px;">Jak appka funguje</button>
+      &nbsp;·&nbsp;
+      <button onclick="showPrivacyModal()" style="text-decoration:underline; color:var(--text-2); font-size:12px;">Ochrana osobních údajů</button>
+    </div>
   </div>
 </div>
 
@@ -1784,6 +1789,51 @@ function openModal(id){
   document.getElementById('modalOverlay').classList.add('open');
 }
 function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+window.showHelpModal = function(){
+  document.getElementById('modalBody').innerHTML = `
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2>Jak appka funguje</h2>
+    <div class="subrow">Příručka Precyz</div>
+    <div style="font-size:13.5px; line-height:1.7; color:var(--text-2);">
+
+      <p style="margin-bottom:16px;">Precyz hledá <b style="color:var(--text);">value sázky</b> — zápasy, kde model vidí vyšší pravděpodobnost výsledku, než naznačuje kurz bookmakera. <b style="color:var(--text);">Negarantuje výhru.</b> Řídí se pravidlem: radši nic než špatně — když appka nenajde skutečnou výhodu, řekne to na rovinu místo aby si tip vymýšlela.</p>
+
+      <h3 style="color:var(--text); font-size:14px; margin-bottom:8px;">Přihlášení</h3>
+      <p style="margin-bottom:16px;">Bez hesla. Zadáš e-mail (musí být schválený administrátorem) → přijde 6místný kód → opíšeš ho do appky. Prohlížeč si tě pak pamatuje, příště se přihlásíš automaticky.</p>
+
+      <h3 style="color:var(--text); font-size:14px; margin-bottom:8px;">Záložky appky</h3>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">📊 Přehled</b> — vyber sport, appka ukáže zápasy ve skenu (Liga / Mezinárodní). Nahoře KPI dne, „Tip dne" a top value karty.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">💰 Value</b> — jen zápasy se skutečnou výhodou (EV ≥ 5 %).</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">📈 Analýza</b> — Monte-Carlo simulace, faktory odhadu, pohyb kurzu v čase.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">📡 Radar</b> — arbitráž, value proti ostré knize, experimentální model signál.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">💳 Moje sázky</b> — tvoje pokladna (3 peněženky), historie, graf zisku. Max vklad je 5 % pokladny (Kelly pojistka). Sázku jde vyhodnotit až po pravděpodobném konci zápasu.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">📅 Kalendář</b> — přehled dnů s value/výhrami/prohrami.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">🏆 Žebříček</b> — živé srovnání se všemi schválenými uživateli.</p>
+      <p style="margin-bottom:16px;"><b style="color:var(--text);">⚙️ Admin</b> — jen pro administrátora appky, správa přístupu.</p>
+
+      <h3 style="color:var(--text); font-size:14px; margin-bottom:8px;">Pojmy</h3>
+      <p style="margin-bottom:4px;"><b style="color:var(--text);">EV</b> — očekávaná hodnota sázky v %. Kladné = model vidí výhodu.</p>
+      <p style="margin-bottom:4px;"><b style="color:var(--text);">Kelly vklad</b> — matematicky doporučená výše sázky.</p>
+      <p style="margin-bottom:4px;"><b style="color:var(--text);">Confidence</b> — jak moc appka věří vlastnímu odhadu (NE pravděpodobnost výhry).</p>
+      <p style="margin-bottom:16px;"><b style="color:var(--text);">NO BET</b> — appka občas záměrně nic nedoporučí. Je to stejně platný výstup jako tip.</p>
+
+      <h3 style="color:var(--red); font-size:14px; margin-bottom:8px;">🛡️ Bezpečné hraní</h3>
+      <p style="margin-bottom:10px;">Precyz je analytický nástroj, ne záruka výhry. I sázka s pozitivním EV může prohrát — výhoda se projeví až v dlouhodobém průměru.</p>
+      <p style="margin-bottom:6px;">• Nevkládej celou pokladnu hned — drž se Kelly limitu i po prohrách.</p>
+      <p style="margin-bottom:6px;">• Sázej jen to, co si můžeš dovolit ztratit.</p>
+      <p style="margin-bottom:6px;">• Nesnaž se "dohnat ztrátu" vyšší sázkou.</p>
+      <p style="margin-bottom:16px;">• Zápasy tu budou i zítra — není důvod spěchat.</p>
+
+      <div class="note-box" style="margin-bottom:0;">
+        <b style="color:var(--text);">Kam se obrátit (ČR):</b><br>
+        Linka pomoci pro hráče hazardních her — anonymní, zdarma, nonstop: <b style="color:var(--text);">+420 777 477 877</b><br>
+        Národní linka pro odvykání hraní (Úřad vlády ČR): <b style="color:var(--text);">800 350 000</b> (po–pá 10–18 h), chciodvykat.cz<br>
+        Rejstřík vyloučených osob: dobrovolné vyloučení ze všech legálních sázkovek v ČR — zodpovednehrani.cz
+      </div>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+};
 window.showPrivacyModal = function(){
   document.getElementById('modalBody').innerHTML = `
     <button class="modal-close" onclick="closeModal()">✕</button>
