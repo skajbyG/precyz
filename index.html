@@ -712,20 +712,24 @@ function renderEmailEntry(err){
 }
 
 /* step 2: waiting for them to click the emailed link, with a manual code fallback */
-function renderCheckEmail(err){
+function renderCheckEmail(err, showCode){
   authGateBody().innerHTML = `
     <div class="pending-icon">📩</div>
     <h2 style="text-align:center;">Zkontroluj e-mail</h2>
-    <p class="hint" style="text-align:center;">Poslali jsme e-mail na <b>${pendingLoginEmail}</b>. Opiš sem 6místný kód z e-mailu (doporučeno — spolehlivější než klikat na odkaz, obzvlášť v Apple Mail):</p>
+    <p class="hint" style="text-align:center;">Poslali jsme e-mail na <b>${pendingLoginEmail}</b>. Klikni na odkaz v e-mailu a přihlásíš se automaticky.</p>
     ${err ? `<div class="auth-error">${err}</div>` : ''}
-    <div class="auth-field"><input type="text" id="otpCode" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" style="text-align:center; letter-spacing:4px; font-size:18px;" onkeydown="if(event.key==='Enter') document.getElementById('verifyOtpBtn').click()"></div>
-    <button class="btn-primary" id="verifyOtpBtn" onclick="doVerifyOtp(event)">Potvrdit kód</button>
-    <p class="hint" style="text-align:center; margin-top:14px; margin-bottom:0;">Nebo klikni na odkaz přímo v e-mailu.</p>
+    ${showCode ? `
+      <div class="auth-field"><input type="text" id="otpCode" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" style="text-align:center; letter-spacing:4px; font-size:18px;" onkeydown="if(event.key==='Enter') document.getElementById('verifyOtpBtn').click()"></div>
+      <button class="btn-primary" id="verifyOtpBtn" onclick="doVerifyOtp(event)">Potvrdit kód</button>
+    ` : `
+      <button class="btn-primary" style="background:transparent; border:1px solid var(--stroke-2); color:var(--text);" onclick="renderCheckEmail(null, true)">Odkaz nefunguje? Zadat kód ručně</button>
+    `}
     <div class="auth-switch">
-      <button onclick="doResendCode()">Poslat kód znovu</button> · <button onclick="renderEmailEntry()">jiný e-mail</button>
+      <button onclick="doResendCode()">Poslat znovu</button> · <button onclick="renderEmailEntry()">jiný e-mail</button>
     </div>
   `;
   showGate();
+  if(showCode) setTimeout(()=>{ const el = document.getElementById('otpCode'); if(el) el.focus(); }, 50);
 }
 window.doResendCode = async function(){
   const secsLeft = Math.ceil((CODE_RESEND_COOLDOWN_S*1000 - (Date.now()-lastCodeSentAt))/1000);
@@ -794,14 +798,14 @@ window.doSendLink = async function(ev){
 window.doVerifyOtp = async function(ev){
   const btn = ev ? ev.currentTarget : document.getElementById('verifyOtpBtn');
   const code = document.getElementById('otpCode').value.trim();
-  if(!code){ renderCheckEmail('Opiš kód z e-mailu.'); return; }
+  if(!code){ renderCheckEmail('Opiš kód z e-mailu.', true); return; }
   setBtnLoading(btn, true, 'Ověřuju…');
   try{
     const { error } = await supabase.auth.verifyOtp({ email: pendingLoginEmail, token: code, type: 'email' });
     if(error) throw error;
     // onAuthStateChange picks up the new session from here
   }catch(e){
-    renderCheckEmail(renderAuthError(e.message));
+    renderCheckEmail(renderAuthError(e.message), true);
   } finally {
     setBtnLoading(btn, false);
   }
