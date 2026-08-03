@@ -345,7 +345,7 @@ svg.pnl-chart{width:100%; height:140px;}
   display:flex; align-items:center; justify-content:center; font-weight:800;
 }
 .cal-dots{display:flex; gap:4px; flex-wrap:wrap;}
-.cal-dots span{width:8px; height:8px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.15);}
+.cal-dots span{width:11px; height:11px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.15);}
 .legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:16px; font-size:11px; color:var(--text-2);}
 .legend .li{display:flex; align-items:center; gap:5px;}
 .legend .sw{width:7px; height:7px; border-radius:50%;}
@@ -1616,10 +1616,10 @@ function dayHasDot(dateStr){
   const dayBets = bets.filter(b=> (b.date_key || (b.date && b.date.slice(0,10))) === dateStr);
   if(dayBets.some(b=>b.status==='win')) dots.push('var(--emerald)');
   if(dayBets.some(b=>b.status==='lose')) dots.push('var(--red)');
-  if(dayBets.some(b=>b.status==='open')) dots.push('var(--gold)');
+  if(dayBets.some(b=>b.status==='open')) dots.push('#ffd23f');
   const dayMatches = MATCHES.filter(m=>m.date_key===dateStr);
-  if(dayMatches.some(m=>m._tier!=='skip')) dots.push('var(--teal)');
-  if(dayMatches.length) dots.push('var(--text-3)');
+  if(dayMatches.some(m=>m._tier!=='skip')) dots.push('var(--gold)');
+  if(dayMatches.length) dots.push('#8b5cf6');
   if(eventsFor(dateStr).length) dots.push('var(--arb)');
   return dots;
 }
@@ -1707,11 +1707,11 @@ function renderCalendar(){
       ${cells}
     </div>
     <div class="legend">
-      <div class="li"><span class="sw" style="background:var(--teal)"></span>Value</div>
+      <div class="li"><span class="sw" style="background:var(--gold)"></span>Value</div>
       <div class="li"><span class="sw" style="background:var(--emerald)"></span>Výhra</div>
       <div class="li"><span class="sw" style="background:var(--red)"></span>Prohra</div>
-      <div class="li"><span class="sw" style="background:var(--gold)"></span>Otevřená sázka</div>
-      <div class="li"><span class="sw" style="background:var(--text-3)"></span>Ve skenu</div>
+      <div class="li"><span class="sw" style="background:#ffd23f"></span>Otevřená sázka</div>
+      <div class="li"><span class="sw" style="background:#8b5cf6"></span>Ve skenu</div>
       <div class="li"><span class="sw" style="background:var(--arb)"></span>Milník appky</div>
     </div>
     <div id="dayDetail">${detail}</div>
