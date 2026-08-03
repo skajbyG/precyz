@@ -859,7 +859,21 @@ async function handleAuthedUser(user){
   currentUser = user;
   const email = (user.email || '').toLowerCase();
   const { data: allowed, error } = await supabase.rpc('is_email_allowed', { check_email: email });
-  if(error || !allowed){
+
+  if(error){
+    // Síťová/dočasná chyba — appka NESMÍ z tohohle usoudit, že přístup nemáš, a nesmí
+    // kvůli tomu mazat uložené přihlášení. Ukaž chybu s možností to zkusit znovu.
+    authGateBody().innerHTML = `
+      <div class="pending-icon">📡</div>
+      <h2 style="text-align:center;">Nepodařilo se ověřit přístup</h2>
+      <p class="hint" style="text-align:center;">Appka nedosáhla na databázi (asi slabý signál nebo výpadek sítě). Tvoje přihlášení zůstává uložené — zkus to prosím znovu.</p>
+      <button class="btn-primary" onclick="handleAuthedUser(currentUser)">Zkusit znovu</button>
+    `;
+    showGate();
+    return;
+  }
+  if(!allowed){
+    // RPC v pořádku proběhlo a jasně řeklo "ne" — teprve tohle je skutečné odepření přístupu.
     await supabase.auth.signOut();
     renderNotAllowed(email);
     return;
@@ -878,6 +892,7 @@ async function handleAuthedUser(user){
   maybeShowWelcome();
   if(isIOS()) setTimeout(maybeShowInstallHint, 2000);
 }
+window.handleAuthedUser = handleAuthedUser;
 function maybeShowWelcome(){
   try{
     if(localStorage.getItem('precyz_welcomed_v1')) return;
