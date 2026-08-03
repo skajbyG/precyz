@@ -332,12 +332,14 @@ svg.pnl-chart{width:100%; height:140px;}
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
 .cal-dow{text-align:center; font-size:10.5px; color:var(--text-3); font-weight:700; padding-bottom:6px; text-transform:uppercase;}
 .cal-cell{
-  aspect-ratio:1/1; border-radius:12px; background:var(--surface); border:1px solid var(--stroke);
+  aspect-ratio:1/1; border-radius:12px; background:transparent; border:1px solid var(--stroke);
   padding:6px; display:flex; flex-direction:column; justify-content:space-between; position:relative; transition:all .25s;
 }
-.cal-cell:hover{border-color:var(--stroke-2); transform:translateY(-2px);}
-.cal-cell.muted{opacity:.35;}
-.cal-cell .num{font-size:12px; font-weight:600; font-family:'JetBrains Mono',monospace;}
+.cal-cell:hover{border-color:var(--stroke-2); transform:translateY(-2px); background:var(--surface);}
+.cal-cell.muted{opacity:.28;}
+.cal-cell.has-content{background:var(--surface); border-color:var(--stroke-2);}
+.cal-cell .num{font-size:12px; font-weight:600; font-family:'JetBrains Mono',monospace; color:var(--text-3);}
+.cal-cell.has-content .num{color:var(--text);}
 .cal-cell.today .num{
   width:20px; height:20px; border-radius:50%; background:#ff453a; color:#fff;
   display:flex; align-items:center; justify-content:center; font-weight:800;
@@ -783,6 +785,13 @@ function watchOwnAccess(email){
       showToast('Přístup byl odebrán administrátorem.', 'error');
       doLogout();
     })
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'allowed_emails', filter:`email=eq.${email}` }, async ()=>{
+      const { data: allowed } = await supabase.rpc('is_email_allowed', { check_email: email });
+      if(!allowed){
+        showToast('Předplatné vypršelo nebo byl přístup upraven administrátorem.', 'error');
+        doLogout();
+      }
+    })
     .subscribe();
 }
 
@@ -879,26 +888,43 @@ async function renderAdminPanel(){
     const rows = data || [];
 
     const statusHtml = await renderSyncStatusBox();
+    const todayStr = localDateStr(new Date());
 
     el.innerHTML = `
       <h1 class="title">Admin</h1>
       ${statusHtml}
-      <p class="subtle">Spravuj, kdo má do appky přístup. Přidáváš a odebíráš okamžitě, live.</p>
+      <p class="subtle">Spravuj, kdo má do appky přístup, kolik platí a dokdy. Přidáváš a odebíráš okamžitě, live.</p>
       <div class="bet-form" style="margin-bottom:20px;">
-        <div class="bet-form-row" style="margin-bottom:0;">
-          <input type="email" id="newAllowedEmail" placeholder="email@osoba.cz" onkeydown="if(event.key==='Enter') document.getElementById('addAllowedBtn').click()">
-          <button class="btn-primary" id="addAllowedBtn" style="flex:0 0 auto; width:auto; padding:9px 18px;" onclick="adminAddEmail(event)">Přidat</button>
+        <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Přidat / upravit přístup</div>
+        <div class="bet-form-row">
+          <input type="email" id="newAllowedEmail" placeholder="email@osoba.cz">
         </div>
+        <div class="bet-form-row">
+          <input type="number" id="newAllowedPrice" placeholder="Cena Kč (nepovinné)" min="0">
+          <input type="date" id="newAllowedExpires" placeholder="Vyprší (nepovinné)">
+        </div>
+        <button class="btn-primary" id="addAllowedBtn" onclick="adminAddEmail(event)">Uložit</button>
       </div>
       <div class="section-lbl">Povolené e-maily (${rows.length})</div>
-      ${rows.length ? rows.map(r=>`
+      ${rows.length ? rows.map(r=>{
+        const expired = r.expires_at && r.expires_at < todayStr;
+        const soon = r.expires_at && !expired && r.expires_at <= localDateStr(new Date(Date.now()+7*86400000));
+        const expiresColor = expired ? 'var(--red)' : soon ? 'var(--gold)' : 'var(--text-2)';
+        const expiresLabel = r.expires_at ? `${expired?'Vypršelo':'Vyprší'} ${new Date(r.expires_at).toLocaleDateString('cs-CZ')}` : 'Bez expirace';
+        return `
         <div class="admin-user-row">
-          <span class="email">${r.email}</span>
+          <span class="email">
+            ${r.email}
+            <span style="display:block; font-size:11px; color:var(--text-2); font-weight:400; margin-top:2px;">
+              ${r.price_czk ? fmtCzk(r.price_czk) + ' · ' : ''}<span style="color:${expiresColor};">${expiresLabel}</span>
+            </span>
+          </span>
           <div class="actions">
+            <button class="btn-small btn-approve" onclick="adminEditEmail('${r.email}', ${r.price_czk||'null'}, ${r.expires_at?`'${r.expires_at}'`:'null'})">Upravit</button>
             <button class="btn-small btn-reject" onclick="adminRemoveEmail('${r.email}')">Odebrat</button>
           </div>
         </div>
-      `).join('') : `<div class="empty-state"><div class="big">📭</div><div class="t">Zatím nikdo</div>Přidej první e-mail výše.</div>`}
+      `;}).join('') : `<div class="empty-state"><div class="big">📭</div><div class="t">Zatím nikdo</div>Přidej první e-mail výše.</div>`}
     `;
   }catch(e){
     el.innerHTML = `<h1 class="title">Admin</h1><div class="empty-state"><div class="big">⚠️</div><div class="t">Nepodařilo se načíst seznam</div>${e.message}</div>`;
@@ -912,16 +938,31 @@ async function renderAdminPanel(){
       .subscribe();
   }
 }
+window.adminEditEmail = function(email, price, expires){
+  document.getElementById('newAllowedEmail').value = email;
+  document.getElementById('newAllowedPrice').value = price != null ? price : '';
+  document.getElementById('newAllowedExpires').value = expires || '';
+  document.getElementById('newAllowedEmail').scrollIntoView({behavior:'smooth', block:'center'});
+};
 window.adminAddEmail = async function(ev){
   const btn = ev ? ev.currentTarget : document.getElementById('addAllowedBtn');
-  const input = document.getElementById('newAllowedEmail');
-  const email = input.value.trim().toLowerCase();
+  const email = document.getElementById('newAllowedEmail').value.trim().toLowerCase();
+  const priceRaw = document.getElementById('newAllowedPrice').value;
+  const expiresRaw = document.getElementById('newAllowedExpires').value;
   if(!email){ showToast('Vyplň e-mail.', 'error'); return; }
-  setBtnLoading(btn, true, 'Přidávám…');
+  setBtnLoading(btn, true, 'Ukládám…');
   try{
-    const { error } = await supabase.from('allowed_emails').insert({ email });
+    const row = {
+      email,
+      price_czk: priceRaw ? Math.round(Number(priceRaw)) : null,
+      expires_at: expiresRaw || null
+    };
+    const { error } = await supabase.from('allowed_emails').upsert(row, { onConflict: 'email' });
     if(error) throw error;
-    showToast('Přidáno: ' + email);
+    showToast('Uloženo: ' + email);
+    document.getElementById('newAllowedEmail').value = '';
+    document.getElementById('newAllowedPrice').value = '';
+    document.getElementById('newAllowedExpires').value = '';
     renderAdminPanel();
   }catch(e){ showToast('Chyba: '+e.message, 'error'); }
   finally { setBtnLoading(btn, false); }
@@ -1572,7 +1613,8 @@ function renderCalendar(){
     const isToday = dateStr===todayStr;
     const dots = dayHasDot(dateStr);
     const dayEvents = eventsFor(dateStr);
-    cells += `<div class="cal-cell ${muted?'muted':''} ${isToday?'today':''}" onclick="selectDay('${dateStr}')">
+    const hasContent = dots.length>0 || dayEvents.length>0;
+    cells += `<div class="cal-cell ${muted?'muted':''} ${isToday?'today':''} ${hasContent?'has-content':''}" onclick="selectDay('${dateStr}')">
       <span class="num">${dayNum}</span>
       ${dayEvents.length ? `<span style="position:absolute; top:6px; right:6px; font-size:12px;" title="${dayEvents[0].label}">${dayEvents[0].emoji}</span>` : ''}
       <div class="cal-dots">${dots.slice(0,4).map(c=>`<span style="background:${c}"></span>`).join('')}</div>
@@ -1581,7 +1623,46 @@ function renderCalendar(){
 
   const detail = state.calSelectedDay ? renderDayDetail(state.calSelectedDay) : '';
 
+  // kolik zápasů/milníků padá do zobrazeného měsíce
+  const monthMatches = MATCHES.filter(mt=>{
+    const d = new Date(mt.start_time);
+    return d.getFullYear()===y && d.getMonth()===m;
+  });
+  const monthEvents = SPECIAL_EVENTS.filter(e=>{
+    const d = new Date(e.date_key);
+    return d.getFullYear()===y && d.getMonth()===m;
+  });
+
+  // nejbližší nadcházející zápasy napříč všemi měsíci — ať appka vždy má co ukázat,
+  // i když je aktuálně zobrazený měsíc řídký
+  const now = Date.now();
+  const upcoming = MATCHES.filter(mt=>new Date(mt.start_time).getTime() >= now)
+    .sort((a,b)=>new Date(a.start_time)-new Date(b.start_time))
+    .slice(0,5);
+
+  const upcomingHtml = upcoming.length ? `
+    <div class="section-lbl">Nejbližší zápasy</div>
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:20px;">
+      ${upcoming.map(mt=>`
+        <div class="bet-row" style="cursor:pointer;" onclick="jumpToMatchDay('${mt.date_key}')">
+          <div>
+            <b>${mt.home_team} vs ${mt.away_team}</b><br>
+            <span style="color:var(--text-2)">${COUNTRY[mt.country].flag} ${mt.league}</span>
+          </div>
+          <span class="mono" style="color:var(--text-2); font-size:12px;">${fmtDate(mt.start_time)} · ${fmtTime(mt.start_time)}</span>
+        </div>
+      `).join('')}
+    </div>
+  ` : `
+    <div class="empty-state" style="margin-bottom:20px;">
+      <div class="big">📭</div>
+      <div class="t">Zatím žádné nadcházející zápasy</div>
+      Databáze zápasů je prázdná nebo čeká na další běh automatiky.
+    </div>
+  `;
+
   el.innerHTML = `
+    ${upcomingHtml}
     <div class="cal-head">
       <h2>${MONTHS_CZ[m]} ${y}</h2>
       <div class="cal-nav">
@@ -1590,6 +1671,7 @@ function renderCalendar(){
         <button onclick="calNext()">›</button>
       </div>
     </div>
+    <p class="subtle" style="margin-top:-8px;">${monthMatches.length ? `${monthMatches.length} ${monthMatches.length===1?'zápas':monthMatches.length<5?'zápasy':'zápasů'} tento měsíc` : 'Žádné zápasy tento měsíc'}${monthEvents.length ? ` · ${monthEvents.length} milník appky` : ''}</p>
     <div class="cal-grid">
       ${DOW_CZ.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
       ${cells}
@@ -1604,6 +1686,13 @@ function renderCalendar(){
     </div>
     <div id="dayDetail">${detail}</div>
   `;
+}
+function jumpToMatchDay(dateStr){
+  const d = new Date(dateStr);
+  state.calMonth = d.getMonth();
+  state.calYear = d.getFullYear();
+  state.calSelectedDay = dateStr;
+  renderCalendar();
 }
 function calPrev(){ state.calMonth--; if(state.calMonth<0){state.calMonth=11; state.calYear--;} renderCalendar(); }
 function calNext(){ state.calMonth++; if(state.calMonth>11){state.calMonth=0; state.calYear++;} renderCalendar(); }
