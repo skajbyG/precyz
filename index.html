@@ -718,7 +718,7 @@ function renderCheckEmail(err){
     <h2 style="text-align:center;">Zkontroluj e-mail</h2>
     <p class="hint" style="text-align:center;">Poslali jsme e-mail na <b>${pendingLoginEmail}</b>. Opiš sem 6místný kód z e-mailu (doporučeno — spolehlivější než klikat na odkaz, obzvlášť v Apple Mail):</p>
     ${err ? `<div class="auth-error">${err}</div>` : ''}
-    <div class="auth-field"><input type="text" id="otpCode" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore data-form-type="other" style="text-align:center; letter-spacing:4px; font-size:18px;" onkeydown="if(event.key==='Enter') document.getElementById('verifyOtpBtn').click()"></div>
+    <div class="auth-field"><input type="text" id="otpCode" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="off" data-lpignore="true" data-1p-ignore data-form-type="other" style="text-align:center; letter-spacing:4px; font-size:18px;" onkeydown="if(event.key==='Enter') document.getElementById('verifyOtpBtn').click()"></div>
     <button class="btn-primary" id="verifyOtpBtn" onclick="doVerifyOtp(event)">Potvrdit kód</button>
     <p class="hint" style="text-align:center; margin-top:14px; margin-bottom:0;">Nebo klikni na odkaz přímo v e-mailu.</p>
     <div class="auth-switch">
