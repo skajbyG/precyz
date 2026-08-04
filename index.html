@@ -1245,11 +1245,13 @@ function devig(odds){
   keys.forEach(k=> p[k]=inv[k]/sum );
   return p;
 }
+const BOOKMAKER_LABELS = { tipsport:'Tipsport', fortuna:'Fortuna', betano:'Betano' };
+function bookmakerLabel(key){ return BOOKMAKER_LABELS[key] || key; }
 function bestBook(match, outcome){
   let best=null, bestOdds=-1;
-  ['tipsport','fortuna','betano'].forEach(b=>{
-    const o = match.bookmaker_odds[b][outcome];
-    if(o>bestOdds){ bestOdds=o; best=b; }
+  Object.keys(match.bookmaker_odds || {}).forEach(b=>{
+    const o = match.bookmaker_odds[b] ? match.bookmaker_odds[b][outcome] : null;
+    if(o!=null && o>bestOdds){ bestOdds=o; best=b; }
   });
   return {book:best, odds:bestOdds};
 }
@@ -1465,7 +1467,7 @@ function renderOverview(){
     <div class="hero-tip">
       <div class="eyebrow">Tip dne</div>
       <div class="teams">${heroMatch.home_team} vs ${heroMatch.away_team}</div>
-      <div class="meta">${COUNTRY[heroMatch.country].flag} ${heroMatch.league} · ${fmtDate(heroMatch.start_time)} ${fmtTime(heroMatch.start_time)} · doporučení: <b>${outcomeLabel(heroMatch.sport, heroMatch._best.outcome, heroMatch)}</b> @ ${heroMatch._best.odds.toFixed(2)} (${heroMatch._best.book})</div>
+      <div class="meta">${COUNTRY[heroMatch.country].flag} ${heroMatch.league} · ${fmtDate(heroMatch.start_time)} ${fmtTime(heroMatch.start_time)} · doporučení: <b>${outcomeLabel(heroMatch.sport, heroMatch._best.outcome, heroMatch)}</b> @ ${heroMatch._best.odds.toFixed(2)} (${bookmakerLabel(heroMatch._best.book)})</div>
       <div class="prob-bar">${barHtml}</div>
       <div class="prob-legend">${legendHtml}</div>
     </div>
@@ -1784,7 +1786,7 @@ function renderMyBets(){
         <div class="bet-row">
           <div>
             <b>${b.match}</b><br>
-            <span style="color:var(--text-2)">${b.selection} @ ${b.odds.toFixed(2)} · ${b.book} · ${fmtCzk(b.stake)}</span>
+            <span style="color:var(--text-2)">${b.selection} @ ${b.odds.toFixed(2)} · ${bookmakerLabel(b.book)} · ${fmtCzk(b.stake)}</span>
           </div>
           ${b.status==='open'
             ? (started
@@ -2017,7 +2019,7 @@ function buildMockLeaderboard(){
       const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
       const outcome = outcomes[Math.floor(rnd()*outcomes.length)];
       const book = ['tipsport','fortuna','betano'][Math.floor(rnd()*3)];
-      const odds = m.bookmaker_odds[book][outcome];
+      const odds = bestBook(m, outcome).odds;
       const stake = 100 + Math.floor(rnd()*900);
       const winProb = m.our_probabilities[outcome] || (1/outcomes.length);
       const win = rnd() < winProb;
@@ -2127,13 +2129,19 @@ function openModal(id){
   if(!m) return;
   const meta = SPORT_META[m.sport];
   const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
-  const books = ['tipsport','fortuna','betano'];
+  // Kurzové kanceláře k porovnání — dynamicky podle toho, co má tenhle zápas skutečně
+  // k dispozici (ruční ověřená data mají Tipsport/Fortuna/Betano, data z reálného API
+  // mají skutečné mezinárodní kurzové kanceláře). Max 4 sloupce, ať se to vejde.
+  const availableBooks = Object.keys(m.bookmaker_odds || {}).slice(0, 4);
 
   let tableRows = outcomes.map(o=>{
     const best = bestBook(m,o);
     return `<tr>
       <td>${o==='home'?'1 · '+m.home_team : o==='draw' ? 'X · Remíza' : '2 · '+m.away_team}</td>
-      ${books.map(b=>`<td class="${b===best.book?'best':''}">${m.bookmaker_odds[b][o].toFixed(2)}</td>`).join('')}
+      ${availableBooks.map(b=>{
+        const v = m.bookmaker_odds[b] ? m.bookmaker_odds[b][o] : null;
+        return `<td class="${b===best.book?'best':''}">${v!=null ? v.toFixed(2) : '—'}</td>`;
+      }).join('')}
     </tr>`;
   }).join('');
 
@@ -2151,13 +2159,14 @@ function openModal(id){
 
     <div class="odds-table-wrap">
       <table class="odds-table">
-        <tr><th>Výsledek</th><th>Tipsport</th><th>Fortuna</th><th>Betano</th></tr>
+        <tr><th>Výsledek</th>${availableBooks.map(b=>`<th>${bookmakerLabel(b)}</th>`).join('')}</tr>
         ${tableRows}
       </table>
     </div>
+    ${m.source==='real-api' ? `<p class="subtle" style="margin-top:-8px; margin-bottom:14px;">Živá data z mezinárodních kurzových kanceláří — vsadit ale samozřejmě můžeš u kteréhokoliv ze svých tří účtů níž.</p>` : ''}
 
     <div class="stat-grid">
-      <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${m._best.book})</div></div>
+      <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${bookmakerLabel(m._best.book)})</div></div>
       <div class="stat-box"><div class="v">${(m._best.p*100).toFixed(0)}%</div><div class="l">Naše pravděpodobnost</div></div>
       <div class="stat-box"><div class="v">${fmtCzk(kelly)}</div><div class="l">Kelly vklad (0.25×)</div></div>
     </div>
@@ -2292,7 +2301,7 @@ async function placeBet(matchId){
   const book = document.getElementById('betBook').value;
   const stake = Math.max(10, Math.round(Number(document.getElementById('betStake').value)||0));
   if(bankroll[book] < stake){ showToast('Nedostatek prostředků v peněžence '+book+'.', 'error'); return; }
-  const odds = m.bookmaker_odds[book][outcome];
+  const odds = bestBook(m, outcome).odds; // nejlepší dostupný kurz — appka nepředstírá, že zná přesný kurz konkrétní tvé kanceláře
   bankroll[book] -= stake;
   saveBankroll(bankroll);
   const bet = {
