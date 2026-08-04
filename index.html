@@ -275,6 +275,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .tag.skip{background:rgba(255,138,111,.10); color:var(--text-3);}
 .tag.ghost{background:var(--surface-2); color:var(--text-2);}
 .odds-row{display:flex; gap:8px;}
+.card-freshness{font-size:10.5px; color:var(--text-3); margin-top:8px;}
 .odds-cell{
   flex:1; text-align:center; background:var(--surface-2); border-radius:10px; padding:8px 4px;
   font-family:'JetBrains Mono',monospace;
@@ -554,6 +555,10 @@ footer{
 button, .cat-tile, .card, .pill, .seg-btn, .kpi, .wallet, .cal-cell, .lb-row, .feed-row{
   -webkit-tap-highlight-color:transparent;
 }
+/* Přístupnost: viditelné zaměření při navigaci klávesnicí, ale ne při klikání myší/dotykem */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--gold); outline-offset:2px; border-radius:6px;
+}
 button:active, .cat-tile:active, .card:active, .pill:active{
   transform:scale(.97);
   transition:transform .12s var(--ease);
@@ -650,7 +655,7 @@ button:focus-visible, input:focus-visible{
     <div class="header-right">
       <div class="clock mono" id="clock">--:--:--</div>
       <div class="age-chip"><span class="dot-live"></span><span id="ageChip">Kurzy: před chvílí</span></div>
-      <button class="pill" style="margin-left:6px;" onclick="showHelpModal()" title="Nápověda">?</button>
+      <button class="pill" style="margin-left:6px;" onclick="showHelpModal()" title="Nápověda" aria-label="Nápověda">?</button>
       <button id="logoutBtn" class="pill" style="margin-left:6px;" onclick="doLogout()">Odhlásit</button>
     </div>
   </header>
@@ -1111,6 +1116,26 @@ window.recordMatchResult = async function(matchId, result){
   }catch(e){ showToast('Nepodařilo se zapsat výsledek.', 'error'); }
 };
 
+window.downloadBackup = async function(){
+  showToast('Stahuju zálohu…');
+  try{
+    const tables = ['matches', 'bets', 'allowed_emails', 'recommendation_log', 'system_status', 'wallet_history'];
+    const backup = { created_at: new Date().toISOString(), tables: {} };
+    for(const t of tables){
+      const { data, error } = await supabase.from(t).select('*');
+      backup.tables[t] = error ? { error: error.message } : data;
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `precyz-zaloha-${localDateStr(new Date())}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Záloha stažena.');
+  }catch(e){
+    showToast('Záloha se nepodařila: ' + (e && e.message || 'neznámá chyba'), 'error');
+  }
+};
 async function renderAdminPanel(){
   const el = document.getElementById('panel-8');
   if(!el) return;
@@ -1128,6 +1153,13 @@ async function renderAdminPanel(){
       <h1 class="title">Admin</h1>
       ${statusHtml}
       ${accuracyHtml}
+      <div class="note-box" style="margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <b style="color:var(--text);">💾 Záloha dat</b>
+          <p style="margin:4px 0 0; font-size:12px; color:var(--text-2);">Supabase free tier nedělá automatické zálohy — stáhni si vlastní kopii pro jistotu.</p>
+        </div>
+        <button class="btn-primary" style="width:auto; padding:9px 16px; font-size:12.5px; flex-shrink:0;" onclick="downloadBackup()">Stáhnout</button>
+      </div>
       <p class="subtle">Spravuj, kdo má do appky přístup, kolik platí a dokdy. Přidáváš a odebíráš okamžitě, live.</p>
       <div class="bet-form" style="margin-bottom:20px;">
         <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Přidat / upravit přístup</div>
@@ -1506,6 +1538,13 @@ function isDerby(home, away){
     (home.includes(a)&&away.includes(b)) || (home.includes(b)&&away.includes(a))
   );
 }
+function safeMatchCardHtml(m){
+  try{ return matchCardHtml(m); }
+  catch(e){
+    console.debug('[Precyz] failed to render match card, skipping:', m && m.id, e && e.message);
+    return '';
+  }
+}
 function matchCardHtml(m){
   const meta = SPORT_META[m.sport];
   const c = COUNTRY[m.country];
@@ -1523,6 +1562,7 @@ function matchCardHtml(m){
   const [pickOutcome, pickP] = pickEntries.reduce((a,b)=> b[1]>a[1] ? b : a);
   const pickLabel = pickOutcome==='home' ? m.home_team : pickOutcome==='draw' ? 'Remíza' : m.away_team;
   const derby = isDerby(m.home_team, m.away_team);
+  const freshness = m.updated_at ? formatAge(Math.floor((Date.now()-new Date(m.updated_at).getTime())/60000)) : null;
   return `
   <div class="card" style="--accent:${meta.color}" onclick="openModal('${m.id}')">
     <div class="card-top">
@@ -1536,6 +1576,7 @@ function matchCardHtml(m){
       <span class="tag ghost">conf ${m.confidence.score}</span>
     </div>
     <div class="odds-row">${oddsHtml}</div>
+    ${freshness ? `<div class="card-freshness">🕐 data aktualizována: ${freshness}</div>` : ''}
   </div>`;
 }
 
@@ -1607,7 +1648,7 @@ function renderOverview(){
 
     <div class="section-lbl">Top value sázky</div>
     <div class="match-grid">
-      ${topValue.length ? topValue.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🔍</div><div class="t">Zatím žádná value</div>Radši nic než špatně — model dnes nenašel jasnou hranu.</div>`}
+      ${topValue.length ? topValue.map(safeMatchCardHtml).join('') : `<div class="empty-state"><div class="big">🔍</div><div class="t">Zatím žádná value</div>Radši nic než špatně — model dnes nenašel jasnou hranu.</div>`}
     </div>
   `;
   requestAnimationFrame(()=>{
@@ -1644,7 +1685,7 @@ function renderCategoryDetail(el){
         <button class="${state.group==='mezi'?'active':''}" onclick="setGroup('mezi')">Mezinárodní / Přátelák (${mezi.length})</button>
       </div>
       <div class="match-grid fade-up">
-        ${list.length ? list.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🗓️</div><div class="t">Nic v této skupině</div>Zkus druhou skupinu.</div>`}
+        ${list.length ? list.map(safeMatchCardHtml).join('') : `<div class="empty-state"><div class="big">🗓️</div><div class="t">Nic v této skupině</div>Zkus druhou skupinu.</div>`}
       </div>
     `;
   }
@@ -1716,7 +1757,7 @@ function renderValue(){
     </div>
     ${search || state.valueFilter!=='all' ? `<p class="results-count">${filtered.length} ${filtered.length===1?'výsledek':filtered.length>=2&&filtered.length<=4?'výsledky':'výsledků'}</p>` : ''}
     <div class="match-grid">
-      ${filtered.length ? filtered.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>${search ? 'Pro tohle hledání nic nenašli.' : 'Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.'}</div>`}
+      ${filtered.length ? filtered.map(safeMatchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>${search ? 'Pro tohle hledání nic nenašli.' : 'Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.'}</div>`}
     </div>
   `;
 }
@@ -1864,22 +1905,63 @@ function renderRadar(){
     <div class="radar-block">
       <div class="radar-head" style="color:var(--emerald)">📐 Value proti ostré knize</div>
       <p class="subtle" style="margin-bottom:12px;">Porovnáno ${sharpCompared} zápasů proti no-vig ceně Pinnacle/Betfair jako referenci trhu.</p>
-      ${sharpValue.length ? `<div class="match-grid">${sharpValue.slice(0,6).map(matchCardHtml).join('')}</div>` :
+      ${sharpValue.length ? `<div class="match-grid">${sharpValue.slice(0,6).map(safeMatchCardHtml).join('')}</div>` :
       `<div class="empty-state"><div class="big">🛡️</div><div class="t">Porovnáno ${sharpCompared} zápasů, žádná value</div>Chrání tě to před sázením se záporným EV.</div>`}
     </div>
 
     <div class="radar-block">
       <div class="radar-head" style="color:var(--gold)">📡 Model signál (ELO)</div>
-      ${eloSignals.length ? `<div class="match-grid">${eloSignals.map(matchCardHtml).join('')}</div>` : `<p class="subtle">Žádný silný ELO signál nad trhem.</p>`}
+      ${eloSignals.length ? `<div class="match-grid">${eloSignals.map(safeMatchCardHtml).join('')}</div>` : `<p class="subtle">Žádný silný ELO signál nad trhem.</p>`}
       <div class="warn-box">⚠️ Model signál je experimentální a NEOVĚŘENÝ proti historii. Ber ho jako doplňkový, nikoli hlavní zdroj rozhodování.</div>
     </div>
 
     <div class="section-lbl">Ve skenu · ${MATCHES.length} zápasů</div>
-    <div class="match-grid">${MATCHES.map(matchCardHtml).join('')}</div>
+    <div class="match-grid">${MATCHES.map(safeMatchCardHtml).join('')}</div>
   `;
 }
 
 /* ============================= PANEL 4: MOJE SÁZKY ============================= */
+function onboardingChecklistHtml(){
+  try{
+    return onboardingChecklistHtmlInner();
+  }catch(e){
+    console.debug('[Precyz] onboarding checklist failed to render:', e && e.message);
+    return '';
+  }
+}
+function onboardingChecklistHtmlInner(){
+  try{ if(localStorage.getItem('precyz_onboarding_dismissed_v1')) return ''; }catch(e){}
+  const items = [
+    { done: window.__precyzPushState === 'subscribed', label: 'Zapnout push oznámení', action: `setActiveTab(7); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: isStandalone(), label: 'Nainstalovat appku na plochu', action: `showToast('Na iPhonu: Sdílet → Přidat na plochu. Na Androidu appka nabídku ukáže sama.')` },
+    { done: (()=>{ try{ return !!localStorage.getItem('precyz_kelly_mode_v1'); }catch(e){ return false; } })(), label: 'Zvolit styl sázení', action: `document.querySelector('.group-toggle')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: (()=>{ try{ return !!localStorage.getItem('precyz_viewed_help_v1'); }catch(e){ return false; } })(), label: 'Přečíst si, jak appka funguje', action: `showHelpModal()` },
+  ];
+  const doneCount = items.filter(i=>i.done).length;
+  if(doneCount === items.length){
+    try{ localStorage.setItem('precyz_onboarding_dismissed_v1','1'); }catch(e){}
+    return '';
+  }
+  return `
+    <div class="note-box" style="margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <b style="color:var(--text);">👋 Začínáš tady (${doneCount}/${items.length})</b>
+        <button onclick="dismissOnboarding()" style="color:var(--text-3); font-size:16px;" aria-label="Zavřít seznam">✕</button>
+      </div>
+      ${items.map(i=>`
+        <div style="display:flex; align-items:center; gap:10px; padding:6px 0; ${i.done?'opacity:.5;':''}">
+          <span style="font-size:15px;">${i.done?'✅':'⬜'}</span>
+          <button onclick="${i.action}" style="font-size:12.5px; text-align:left; color:var(--text); ${i.done?'text-decoration:line-through;':''}" ${i.done?'disabled':''}>${i.label}</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+window.dismissOnboarding = function(){
+  try{ localStorage.setItem('precyz_onboarding_dismissed_v1','1'); }catch(e){}
+  renderSettings();
+};
+
 function renderSettings(){
   const el = document.getElementById('panel-7');
   if(!el) return;
@@ -1889,6 +1971,8 @@ function renderSettings(){
 
   el.innerHTML = `
     <h1 class="title">Nastavení</h1>
+
+    ${onboardingChecklistHtml()}
 
     <div class="section-lbl">Styl sázení</div>
     <div class="group-toggle" style="margin-bottom:8px;">
@@ -2232,7 +2316,7 @@ function renderDayDetail(dateStr){
     ${dayBets.length ? `<div style="margin-bottom:14px;">${dayBets.map(b=>`
       <div class="bet-row"><div><b>${b.match}</b><br><span style="color:var(--text-2)">${b.selection} @ ${b.odds.toFixed(2)} · ${fmtCzk(b.stake)}</span></div><span class="st ${b.status}">${b.status==='open'?'Otevřená':b.status==='win'?'Vyhrál':'Prohrál'}</span></div>
     `).join('')}</div>` : ''}
-    ${dayMatches.length ? `<div class="match-grid">${dayMatches.map(matchCardHtml).join('')}</div>` : `<div class="empty-state"><div class="big">📭</div><div class="t">Žádné zápasy tento den</div></div>`}
+    ${dayMatches.length ? `<div class="match-grid">${dayMatches.map(safeMatchCardHtml).join('')}</div>` : `<div class="empty-state"><div class="big">📭</div><div class="t">Žádné zápasy tento den</div></div>`}
   `;
 }
 
@@ -2356,6 +2440,13 @@ async function renderLeaderboard(){
 
 
 function openModal(id){
+  try{ openModalInner(id); }
+  catch(e){
+    console.debug('[Precyz] failed to open match modal:', id, e && e.message);
+    showToast('Tenhle zápas se nepodařilo zobrazit — zkus to prosím znovu.', 'error');
+  }
+}
+function openModalInner(id){
   const m = MATCHES.find(x=>x.id===id);
   if(!m) return;
   const meta = SPORT_META[m.sport];
@@ -2384,7 +2475,7 @@ function openModal(id){
   }).join('');
 
   document.getElementById('modalBody').innerHTML = `
-    <button class="modal-close" onclick="closeModal()">✕</button>
+    <button class="modal-close" onclick="closeModal()" aria-label="Zavřít">✕</button>
     <h2>${m.home_team} vs ${m.away_team}</h2>
     <div class="subrow">${COUNTRY[m.country].flag} ${m.league} · ${fmtDate(m.start_time)} ${fmtTime(m.start_time)}</div>
 
@@ -2484,8 +2575,9 @@ function openModal(id){
 }
 function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
 window.showHelpModal = function(){
+  try{ localStorage.setItem('precyz_viewed_help_v1','1'); }catch(e){}
   document.getElementById('modalBody').innerHTML = `
-    <button class="modal-close" onclick="closeModal()">✕</button>
+    <button class="modal-close" onclick="closeModal()" aria-label="Zavřít">✕</button>
     <h2>Jak appka funguje</h2>
     <div class="subrow">Příručka Precyz</div>
     <div style="font-size:13.5px; line-height:1.7; color:var(--text-2);">
@@ -2571,7 +2663,7 @@ window.runDiagnostics = function(){
 };
 window.showPrivacyModal = function(){
   document.getElementById('modalBody').innerHTML = `
-    <button class="modal-close" onclick="closeModal()">✕</button>
+    <button class="modal-close" onclick="closeModal()" aria-label="Zavřít">✕</button>
     <h2>Ochrana osobních údajů</h2>
     <div class="subrow">Poslední aktualizace: srpen 2026</div>
     <div style="font-size:13.5px; line-height:1.7; color:var(--text-2);">
@@ -2906,19 +2998,14 @@ setInterval(tickAge, 15000); tickAge();
 
 /* ============================= INIT ============================= */
 function renderAll(){
-  renderOverview();
-  renderValue();
-  renderAnalysis();
-  renderRadar();
-  renderMyBets();
-  renderCalendar();
-  renderLeaderboard();
-  renderSettings();
-  if(currentProfile && currentProfile.role === 'admin') renderAdminPanel();
-  countUp();
-  updateValueBadge();
-  updateSettleBadge();
-  updateAppMood();
+  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderMyBets, renderCalendar, renderLeaderboard, renderSettings, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
+  for(const step of steps){
+    try{ step(); }
+    catch(e){ console.debug('[Precyz] render step failed, continuing with the rest:', step.name, e && e.message); }
+  }
+  if(currentProfile && currentProfile.role === 'admin'){
+    try{ renderAdminPanel(); }catch(e){ console.debug('[Precyz] admin panel render failed:', e && e.message); }
+  }
   requestAnimationFrame(()=>positionThumb(state.tab));
 }
 function updateSettleBadge(){
@@ -3046,7 +3133,10 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   maybeShowInstallHint();
 });
 function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
-function isStandalone(){ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+function isStandalone(){
+  try{ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  catch(e){ return false; }
+}
 function maybeShowInstallHint(){
   if(isStandalone()) return; // už nainstalovaná, appka běží samostatně
   try{ if(localStorage.getItem('precyz_install_dismissed_v1')) return; }catch(e){}
