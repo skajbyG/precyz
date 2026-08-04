@@ -185,8 +185,10 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
   background-size:200% 200%;
   animation:heroGradient 8s ease-in-out infinite;
   border:1px solid var(--stroke-2); border-radius:24px; padding:26px 24px; margin-bottom:24px;
-  position:relative; overflow:hidden;
+  position:relative; overflow:hidden; transition:transform .25s var(--ease), border-color .25s;
 }
+.hero-tip:hover{ transform:translateY(-3px); border-color:var(--gold); }
+.hero-tip:active{ transform:translateY(-1px) scale(.995); }
 @keyframes heroGradient{
   0%{background-position:0% 50%;}
   50%{background-position:100% 50%;}
@@ -447,6 +449,37 @@ svg.pnl-chart{width:100%; height:140px;}
 }
 .themed-input:focus{ outline:none; border-color:var(--gold); }
 .themed-input::placeholder{ color:var(--text-3); }
+
+.toolbar{ display:flex; gap:10px; margin-bottom:6px; flex-wrap:wrap; }
+.search-wrap{
+  flex:1; min-width:200px; position:relative; display:flex; align-items:center;
+  background:var(--surface-2); border:1px solid var(--stroke); border-radius:12px;
+  transition:border-color .2s;
+}
+.search-wrap:focus-within{ border-color:var(--gold); }
+.search-ic{ width:16px; height:16px; margin-left:13px; color:var(--text-3); flex-shrink:0; }
+.search-input{
+  flex:1; background:transparent; border:none; color:var(--text); font-size:16px;
+  font-family:inherit; padding:11px 10px; min-width:0;
+}
+.search-input:focus{ outline:none; }
+.search-input::placeholder{ color:var(--text-3); }
+.search-clear{
+  width:22px; height:22px; border-radius:50%; background:var(--surface); color:var(--text-2);
+  font-size:11px; display:flex; align-items:center; justify-content:center; margin-right:9px;
+  flex-shrink:0; transition:background .15s, color .15s;
+}
+.search-clear:hover{ background:var(--red); color:#fff; }
+.sort-wrap{
+  display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--stroke);
+  border-radius:12px; padding:0 12px 0 13px; flex-shrink:0;
+}
+.sort-wrap select{
+  background:transparent; border:none; color:var(--text); font-size:13.5px; font-weight:600;
+  font-family:inherit; padding:11px 4px; appearance:none; cursor:pointer;
+}
+.sort-wrap select:focus{ outline:none; }
+.results-count{ font-size:12px; color:var(--text-3); margin:10px 2px 14px; }
 .auth-error{
   background:rgba(255,138,111,.1); border:1px solid rgba(255,138,111,.3); color:var(--red);
   border-radius:10px; padding:9px 12px; font-size:12px; margin-bottom:12px;
@@ -1470,8 +1503,8 @@ function renderOverview(){
     </div>
 
     ${heroMatch ? `
-    <div class="hero-tip">
-      <div class="eyebrow">Tip dne</div>
+    <div class="hero-tip" onclick="openModal('${heroMatch.id}')" onkeydown="if(event.key==='Enter'||event.key===' ') openModal('${heroMatch.id}')" style="cursor:pointer;" role="button" tabindex="0">
+      <div class="eyebrow">Tip dne <span style="opacity:.6; font-weight:400; text-transform:none; letter-spacing:0;">— klikni pro detail ›</span></div>
       <div class="teams">${heroMatch.home_team} vs ${heroMatch.away_team}</div>
       <div class="meta">${COUNTRY[heroMatch.country].flag} ${heroMatch.league} · ${fmtDate(heroMatch.start_time)} ${fmtTime(heroMatch.start_time)} · doporučení: <b>${outcomeLabel(heroMatch.sport, heroMatch._best.outcome, heroMatch)}</b> @ ${heroMatch._best.odds.toFixed(2)} (${bookmakerLabel(heroMatch._best.book)})</div>
       <div class="prob-bar">${barHtml}</div>
@@ -1579,14 +1612,22 @@ function renderValue(){
         <button class="pill ${state.valueFilter===k?'active':''}" style="--pill-color:${mm.color}" onclick="setValueFilter('${k}')">${mm.emoji} ${mm.label} (${bySport[k]||0})</button>
       `).join('')}
     </div>
-    <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
-      <input type="text" id="valueSearchInput" class="themed-input" placeholder="🔍 Hledat tým nebo soutěž…" value="${search}" oninput="setValueSearch(this.value)" style="flex:1; min-width:160px;">
-      <select id="valueSortSelect" class="themed-input" onchange="setValueSort(this.value)" style="flex:0 0 auto;">
-        <option value="ev" ${sortKey==='ev'?'selected':''}>Řadit: EV</option>
-        <option value="confidence" ${sortKey==='confidence'?'selected':''}>Řadit: Confidence</option>
-        <option value="time" ${sortKey==='time'?'selected':''}>Řadit: Výkop</option>
-      </select>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-ic" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M20 20L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input type="text" id="valueSearchInput" class="search-input" placeholder="Hledat tým nebo soutěž…" value="${search}" oninput="setValueSearch(this.value)">
+        ${search ? `<button class="search-clear" onclick="setValueSearch('')" aria-label="Vymazat hledání">✕</button>` : ''}
+      </div>
+      <div class="sort-wrap">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:15px; height:15px; flex-shrink:0; opacity:.5;"><path d="M7 12h10M4 6h16M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <select id="valueSortSelect" onchange="setValueSort(this.value)">
+          <option value="ev" ${sortKey==='ev'?'selected':''}>Nejvyšší EV</option>
+          <option value="confidence" ${sortKey==='confidence'?'selected':''}>Nejvyšší confidence</option>
+          <option value="time" ${sortKey==='time'?'selected':''}>Nejbližší výkop</option>
+        </select>
+      </div>
     </div>
+    ${search || state.valueFilter!=='all' ? `<p class="results-count">${filtered.length} ${filtered.length===1?'výsledek':filtered.length>=2&&filtered.length<=4?'výsledky':'výsledků'}</p>` : ''}
     <div class="match-grid">
       ${filtered.length ? filtered.map(matchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>${search ? 'Pro tohle hledání nic nenašli.' : 'Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.'}</div>`}
     </div>
