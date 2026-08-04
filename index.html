@@ -1082,7 +1082,7 @@ async function renderAdminPanel(){
   }
 }
 window.copyInvite = async function(email){
-  const text = `Ahoj! Přidal jsem tě do appky Precyz (sázkařská analytika).\n\nOtevři: https://precyz.netlify.app\nZadej svůj e-mail (${email}) — appka ti pošle přihlašovací kód, žádné heslo netřeba.`;
+  const text = `Ahoj! Přidal jsem tě do appky Precyz (sázkařská analytika).\n\nOtevři: https://skajbyg.github.io/precyz/\nZadej svůj e-mail (${email}) — appka ti pošle přihlašovací kód, žádné heslo netřeba.`;
   try{
     await navigator.clipboard.writeText(text);
     showToast('Pozvánka zkopírována do schránky.');
