@@ -645,6 +645,7 @@ button:focus-visible, input:focus-visible{
       </div>
       <div class="wordmark"><span class="money">precyz</span><span class="dollar">$</span></div>
       <span id="seasonalBadge" style="font-size:16px; margin-left:2px;"></span>
+      <span id="moodBadge" style="font-size:13px; margin-left:6px; color:var(--text-2); cursor:default;"></span>
     </div>
     <div class="header-right">
       <div class="clock mono" id="clock">--:--:--</div>
@@ -1495,6 +1496,16 @@ function fmtTime(iso){
 }
 
 /* ============================= RENDER: CARD ============================= */
+const DERBY_PAIRS = [
+  ['Sparta Praha','Slavia Praha'], ['Slavia','Sparta'], ['Sparta','Slavia'],
+  ['Baník Ostrava','Slovan Liberec'], ['Zbrojovka Brno','Slovácko'],
+  ['Slovan Bratislava','Spartak Trnava'], ['Slovan Bratislava','AS Trenčín'],
+];
+function isDerby(home, away){
+  return DERBY_PAIRS.some(([a,b])=>
+    (home.includes(a)&&away.includes(b)) || (home.includes(b)&&away.includes(a))
+  );
+}
 function matchCardHtml(m){
   const meta = SPORT_META[m.sport];
   const c = COUNTRY[m.country];
@@ -1511,13 +1522,14 @@ function matchCardHtml(m){
   const pickEntries = Object.entries(m.our_probabilities);
   const [pickOutcome, pickP] = pickEntries.reduce((a,b)=> b[1]>a[1] ? b : a);
   const pickLabel = pickOutcome==='home' ? m.home_team : pickOutcome==='draw' ? 'Remíza' : m.away_team;
+  const derby = isDerby(m.home_team, m.away_team);
   return `
   <div class="card" style="--accent:${meta.color}" onclick="openModal('${m.id}')">
     <div class="card-top">
       <div class="card-league"><span class="sport-sq">${meta.emoji}</span>${c.flag} ${m.league}</div>
       ${m.live ? '<div class="card-time live"><span class="live-dot"></span>LIVE</div>' : `<div class="card-time">${fmtDate(m.start_time)} · ${fmtTime(m.start_time)}</div>`}
     </div>
-    <div class="card-teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
+    <div class="card-teams">${derby ? '🔥 ' : ''}${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
     <div class="tag-row">
       <span class="tag ${tier}">${tierLabel(tier)}</span>
       ${tier!=='skip' ? `<span class="tag ghost">${fmtPct(m._best.ev)} EV</span>` : `<span class="tag ghost">👉 ${pickLabel} (${(pickP*100).toFixed(0)}%)</span>`}
@@ -1805,19 +1817,26 @@ async function fillAccuracyStatBox(){
   try{
     const { data, error } = await supabase.from('recommendation_log').select('result, recommended_outcome').not('result','is',null);
     if(error || !data) return;
-    if(!data.length){
-      box.innerHTML = `<div class="analysis-card"><h3>🎯 Přesnost doporučení appky</h3><p class="subtle" style="margin:0;">Appka zatím sbírá první výsledky — jakmile se odehraje pár zápasů, uvidíš tu, jak často appka trefila.</p></div>`;
+
+    // appka vs ty — appka počítáno z recommendation_log, ty počítáno z vlastních vyhodnocených sázek
+    const settledBets = bets.filter(b=>b.status!=='open');
+    const userHits = settledBets.filter(b=>b.status==='win').length;
+    const userPct = settledBets.length ? Math.round(userHits/settledBets.length*100) : null;
+
+    if(!data.length && !settledBets.length){
+      box.innerHTML = `<div class="analysis-card"><h3>🎯 Přesnost doporučení appky</h3><p class="subtle" style="margin:0;">Appka zatím sbírá první výsledky — jakmile se odehraje pár zápasů, uvidíš tu, jak často appka trefila (i jak si vedeš ty).</p></div>`;
       return;
     }
     const hits = data.filter(r=>r.result===r.recommended_outcome).length;
-    const pct = Math.round(hits/data.length*100);
+    const pct = data.length ? Math.round(hits/data.length*100) : null;
     box.innerHTML = `<div class="analysis-card">
-      <h3>🎯 Přesnost doporučení appky</h3>
+      <h3>🎯 Appka vs Ty</h3>
       <div class="stat-grid">
-        <div class="stat-box"><div class="v" style="color:${pct>=50?'var(--emerald)':'var(--gold)'}">${pct}%</div><div class="l">Trefeno</div></div>
-        <div class="stat-box"><div class="v">${hits}/${data.length}</div><div class="l">Zápasů vyhodnoceno</div></div>
+        <div class="stat-box"><div class="v" style="color:${pct===null?'var(--text-3)':pct>=50?'var(--emerald)':'var(--gold)'}">${pct===null?'—':pct+'%'}</div><div class="l">Appka (${hits}/${data.length})</div></div>
+        <div class="stat-box"><div class="v" style="color:${userPct===null?'var(--text-3)':userPct>=50?'var(--emerald)':'var(--gold)'}">${userPct===null?'—':userPct+'%'}</div><div class="l">Ty (${userHits}/${settledBets.length})</div></div>
       </div>
-      <p class="subtle" style="margin:8px 0 0;">Počítáno z doporučení appky (nejpravděpodobnější výsledek), zapsaného ještě PŘED výkopem — appka si tip nemůže zpětně "opravit".</p>
+      ${pct!==null && userPct!==null ? `<p class="subtle" style="margin:8px 0 0;">${userPct>pct ? '👤 Zatím vedeš nad appkou.' : userPct<pct ? '🤖 Appka je zatím přesnější než tvoje volby.' : '🤝 Zatím jste na stejné vlně.'}</p>` : ''}
+      <p class="subtle" style="margin:6px 0 0;">Appka: doporučení zapsané PŘED výkopem, nejde zpětně "opravit". Ty: tvoje skutečné vsazené výběry (ne nutně stejné jako appka).</p>
     </div>`;
   }catch(e){ /* tichý fail, appka funguje i bez téhle statistiky */ }
 }
@@ -2619,12 +2638,45 @@ async function settleBet(betId, result){
   renderMyBets();
   updateSettleBadge();
   fsSyncBet(b);
+  const comment = result==='win' ? pickRandom(WIN_COMMENTS) : pickRandom(LOSE_COMMENTS);
   showToast(
-    result==='win' ? `Vyhráno! +${fmtCzk(b.pnl)} (${b.match})` : `Prohráno: ${fmtCzk(b.pnl)} (${b.match})`,
+    result==='win' ? `Vyhráno! +${fmtCzk(b.pnl)} (${b.match}) — ${comment}` : `Prohráno: ${fmtCzk(b.pnl)} (${b.match}) — ${comment}`,
     result==='win' ? 'success' : 'error'
   );
 }
 window.settleBet = settleBet;
+function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+const WIN_COMMENTS = [
+  'i slepé kuře někdy najde zrno, ale tohle bylo počítané.',
+  'model si tentokrát podal ruku s realitou.',
+  'zapiš si to, další sázka na tom stavět nebude.',
+  'hezké — ale pořád jen jeden datový bod.',
+  'trefa. Kelly by byl spokojený.',
+];
+const LOSE_COMMENTS = [
+  'fotbal je krutý ke všem modelům stejně.',
+  'to se stává i dobrým odhadům — hlavně drž disciplínu dál.',
+  'jedna prohra nic neříká o tom, jestli byla sázka správná.',
+  'variance si vybrala daň. Zítra znovu.',
+  'i s edge se prohrává — jen míň často, ne nikdy.',
+];
+/* ============================= NÁLADA APPKY ============================= */
+// Poctivý odraz toho, kolik value appka aktuálně vidí na trhu — ne předstíraná
+// aktivita. Když nic není, appka to i vizuálně přizná.
+function updateAppMood(){
+  const badge = document.getElementById('moodBadge');
+  if(!badge) return;
+  const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
+  const avgEv = valueOnes.length ? valueOnes.reduce((s,m)=>s+m._best.ev,0)/valueOnes.length : 0;
+  let mood;
+  if(valueOnes.length === 0) mood = { emoji:'🧘', label:'Trpělivá', title:'Appka teď nevidí žádnou value — vyčkává, ne fabrikuje tipy.' };
+  else if(valueOnes.length <= 2 && avgEv < 0.10) mood = { emoji:'🙂', label:'Pozorná', title:'Pár příležitostí, nic převratného.' };
+  else if(avgEv >= 0.15 || valueOnes.length >= 5) mood = { emoji:'⚡', label:'Čilá', title:'Appka vidí víc value než obvykle — mrkni do Value.' };
+  else mood = { emoji:'👀', label:'Ve střehu', title:'Appka sleduje trh, pár slušných příležitostí je vidět.' };
+  badge.textContent = mood.emoji + ' ' + mood.label;
+  badge.title = mood.title;
+}
+
 /* ============================= SEZÓNNÍ VZHLED ============================= */
 // Appka podle aktuálního data jemně promítne roční období/příležitost do vzhledu —
 // žádné vynucování, žádné "vrať se zítra" mechaniky, jen hezký detail.
@@ -2866,6 +2918,7 @@ function renderAll(){
   countUp();
   updateValueBadge();
   updateSettleBadge();
+  updateAppMood();
   requestAnimationFrame(()=>positionThumb(state.tab));
 }
 function updateSettleBadge(){
