@@ -24,6 +24,7 @@
   --stroke:rgba(255,236,216,.09); --stroke-2:rgba(255,236,216,.16);
   --text:#f7f1e9; --text-2:#b4a89a; --text-3:#6d6256;
   --emerald:#63d6a0; --gold:#ffbe72; --teal:#ffb066; --red:#ff8a6f;
+  --wallet-blue:#5b9dff; --wallet-yellow:#ffd23f;
   --football:#63d6a0; --hockey:#6cc6ff; --basketball:#ff9e6b; --tennis:#ffd64f; --arb:#b9a7ff;
   --radius:20px;
   --ease:cubic-bezier(.22,.61,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
@@ -1811,9 +1812,9 @@ function renderMyBets(){
       <div style="text-align:right;"><div class="lbl" style="color:var(--text-2); font-size:12px;">Celkový P/L</div><div class="v mono" style="color:${pnl>=0?'var(--emerald)':'var(--red)'}; font-size:20px;">${pnl>=0?'+':''}${fmtCzk(pnl)}</div></div>
     </div>
     <div class="wallets">
-      <div class="wallet" style="--wc:var(--emerald)"><div class="nm">Tipsport</div><input type="number" value="${bankroll.tipsport}" onchange="updateWallet('tipsport', this.value)"></div>
-      <div class="wallet" style="--wc:var(--red)"><div class="nm">Fortuna</div><input type="number" value="${bankroll.fortuna}" onchange="updateWallet('fortuna', this.value)"></div>
-      <div class="wallet" style="--wc:var(--gold)"><div class="nm">Betano</div><input type="number" value="${bankroll.betano}" onchange="updateWallet('betano', this.value)"></div>
+      <div class="wallet" style="--wc:var(--wallet-blue)"><div class="nm">Tipsport</div><input type="number" value="${bankroll.tipsport}" onchange="updateWallet('tipsport', this.value)"></div>
+      <div class="wallet" style="--wc:var(--wallet-yellow)"><div class="nm">Fortuna</div><input type="number" value="${bankroll.fortuna}" onchange="updateWallet('fortuna', this.value)"></div>
+      <div class="wallet" style="--wc:var(--red)"><div class="nm">Betano</div><input type="number" value="${bankroll.betano}" onchange="updateWallet('betano', this.value)"></div>
     </div>
 
     <div class="section-lbl">Styl sázení</div>
@@ -2292,9 +2293,9 @@ function openModal(id){
         <div class="bet-field">
           <label for="betBook">Peněženka</label>
           <select id="betBook">
-            <option value="tipsport">🟢 Tipsport</option>
-            <option value="fortuna">🔴 Fortuna</option>
-            <option value="betano">🟡 Betano</option>
+            <option value="tipsport">🔵 Tipsport</option>
+            <option value="fortuna">🟡 Fortuna</option>
+            <option value="betano">🔴 Betano</option>
           </select>
         </div>
         <div class="bet-field">
