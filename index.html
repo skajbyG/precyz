@@ -676,6 +676,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // TODO: paste your real Supabase project values here (Project settings → API)
 const SUPABASE_URL = "https://lopxglgvzxdfkkmoblrk.supabase.co";
+// Explicitní cílová adresa appky pro odkazy z e-mailu — GitHub Pages servíruje z podsložky
+// (/precyz/, ne z kořene), takže se nespoléháme na obecné nastavení Site URL v Supabase.
+const PRECYZ_SITE_URL = "https://skajbyg.github.io/precyz/";
 const SUPABASE_ANON_KEY = "sb_publishable_W4nNjK4gx0EKFUzRJZkG1w_iDqoO81F";
 const SUPABASE_CONFIGURED = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
 const ADMIN_EMAIL = 'skybadaniel@icloud.com';
@@ -751,7 +754,7 @@ window.doResendCode = async function(){
   const secsLeft = Math.ceil((CODE_RESEND_COOLDOWN_S*1000 - (Date.now()-lastCodeSentAt))/1000);
   if(secsLeft > 0){ renderCheckEmail(`Počkej ještě ${secsLeft} s, než půjde poslat další kód.`); return; }
   try{
-    const { error } = await supabase.auth.signInWithOtp({ email: pendingLoginEmail, options: { shouldCreateUser: true } });
+    const { error } = await supabase.auth.signInWithOtp({ email: pendingLoginEmail, options: { shouldCreateUser: true, emailRedirectTo: PRECYZ_SITE_URL } });
     if(error) throw error;
     lastCodeSentAt = Date.now();
     renderCheckEmail();
@@ -799,7 +802,7 @@ window.doSendLink = async function(ev){
     if(rpcErr) throw rpcErr;
     if(!allowed){ renderEmailEntry('Tenhle e-mail nemá přístup — musí ho nejdřív přidat administrátor appky.'); return; }
 
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: PRECYZ_SITE_URL } });
     if(error) throw error;
     lastCodeSentAt = Date.now();
     pendingLoginEmail = email;
