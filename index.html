@@ -661,10 +661,11 @@ button:focus-visible, input:focus-visible{
       <button class="seg-btn" data-i="1" role="tab" aria-selected="false">Value<span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="2" role="tab" aria-selected="false">Analýza</button>
       <button class="seg-btn" data-i="3" role="tab" aria-selected="false">Radar</button>
-      <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky</button>
+      <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky<span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kalendář</button>
       <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Žebříček</button>
-      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
+      <button class="seg-btn" data-i="7" role="tab" aria-selected="false">Nastavení</button>
+      <button class="seg-btn" data-i="8" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
     </div>
   </div>
 
@@ -677,6 +678,7 @@ button:focus-visible, input:focus-visible{
     <div class="panel" id="panel-5" role="tabpanel"></div>
     <div class="panel" id="panel-6" role="tabpanel"></div>
     <div class="panel" id="panel-7" role="tabpanel"></div>
+    <div class="panel" id="panel-8" role="tabpanel"></div>
   </div>
 
   <footer>
@@ -942,6 +944,7 @@ async function handleAuthedUser(user){
   maybeShowWelcome();
   applySeasonalTheme();
   if(isIOS()) setTimeout(maybeShowInstallHint, 2000);
+  registerServiceWorker().then(refreshPushState);
 }
 window.handleAuthedUser = handleAuthedUser;
 function maybeShowWelcome(){
@@ -1071,8 +1074,44 @@ async function renderSyncStatusBox(){
   }
 }
 
+async function renderAccuracyBox(){
+  try{
+    const { data, error } = await supabase.from('recommendation_log').select('*').order('start_time', {ascending:false});
+    if(error || !data) return '';
+    const settled = data.filter(r=>r.result);
+    const hits = settled.filter(r=>r.result===r.recommended_outcome).length;
+    const pctTxt = settled.length ? `${Math.round(hits/settled.length*100)} % (${hits}/${settled.length})` : 'zatím žádná data';
+    const pending = data.filter(r=>!r.result && new Date(r.start_time).getTime() < Date.now()).slice(0,8);
+    return `<div class="note-box" style="margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:${pending.length?'10px':'0'};">
+        <span>🎯 Přesnost doporučení appky: <b style="color:var(--text);">${pctTxt}</b></span>
+      </div>
+      ${pending.length ? `
+        <div style="font-size:11.5px; color:var(--text-2); margin-bottom:6px;">Čeká na zápis výsledku:</div>
+        ${pending.map(r=>`
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-top:1px solid var(--stroke);">
+            <div style="font-size:12px; min-width:0;">${r.home_team} vs ${r.away_team}<br><span style="color:var(--text-3);">tip: ${r.recommended_label}</span></div>
+            <div style="display:flex; gap:4px; flex-shrink:0;">
+              <button class="btn-small btn-approve" onclick="recordMatchResult('${r.match_id}','home')">1</button>
+              <button class="btn-small" style="background:var(--surface-2); color:var(--text-2);" onclick="recordMatchResult('${r.match_id}','draw')">X</button>
+              <button class="btn-small btn-reject" onclick="recordMatchResult('${r.match_id}','away')">2</button>
+            </div>
+          </div>
+        `).join('')}
+      ` : ''}
+    </div>`;
+  }catch(e){ return ''; }
+}
+window.recordMatchResult = async function(matchId, result){
+  try{
+    await supabase.from('recommendation_log').update({ result, updated_at: new Date().toISOString() }).eq('match_id', matchId);
+    showToast('Výsledek zapsán.');
+    renderAdminPanel();
+  }catch(e){ showToast('Nepodařilo se zapsat výsledek.', 'error'); }
+};
+
 async function renderAdminPanel(){
-  const el = document.getElementById('panel-7');
+  const el = document.getElementById('panel-8');
   if(!el) return;
   el.innerHTML = `<h1 class="title">Admin</h1><p class="subtle">Načítám…</p>`;
   try{
@@ -1081,11 +1120,13 @@ async function renderAdminPanel(){
     const rows = data || [];
 
     const statusHtml = await renderSyncStatusBox();
+    const accuracyHtml = await renderAccuracyBox();
     const todayStr = localDateStr(new Date());
 
     el.innerHTML = `
       <h1 class="title">Admin</h1>
       ${statusHtml}
+      ${accuracyHtml}
       <p class="subtle">Spravuj, kdo má do appky přístup, kolik platí a dokdy. Přidáváš a odebíráš okamžitě, live.</p>
       <div class="bet-form" style="margin-bottom:20px;">
         <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Přidat / upravit přístup</div>
@@ -1257,8 +1298,28 @@ async function loadMatchesFromDb(){
     MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
     MOCK_LB = buildMockLeaderboard();
     captureClosingOdds();
+    logRecommendations();
   }catch(e){
     console.debug('[Precyz] matches load failed:', e && e.message);
+  }
+}
+// Zapíše aktuální "tip appky" pro zápasy, co ještě nezačaly — jednou zapsáno se
+// nepřepisuje po výkopu, ať appka nemůže zpětně "opravit" tip po vidění výsledku.
+async function logRecommendations(){
+  if(!currentUser) return;
+  const upcoming = MATCHES.filter(m => new Date(m.start_time).getTime() > Date.now());
+  for(const m of upcoming){
+    const entries = Object.entries(m.our_probabilities || {});
+    if(!entries.length) continue;
+    const [outcome, p] = entries.reduce((a,b)=> b[1]>a[1] ? b : a);
+    const label = outcome==='home' ? m.home_team : outcome==='draw' ? 'Remíza' : m.away_team;
+    try{
+      await supabase.from('recommendation_log').upsert({
+        match_id: m.id, home_team: m.home_team, away_team: m.away_team, league: m.league,
+        recommended_outcome: outcome, recommended_label: label, recommended_prob: p,
+        start_time: m.start_time, updated_at: new Date().toISOString()
+      }, { onConflict: 'match_id', ignoreDuplicates: false });
+    }catch(e){ /* nekritické, appka funguje i bez toho */ }
   }
 }
 
@@ -1340,6 +1401,7 @@ function setKellyMode(mode){
   if(!KELLY_MODES[mode]) return;
   try{ localStorage.setItem('precyz_kelly_mode_v1', mode); }catch(e){}
   renderMyBets();
+  renderSettings();
 }
 window.setKellyMode = setKellyMode;
 function kellyStakeCzk(bankroll, p, odds){
@@ -1687,6 +1749,8 @@ function renderAnalysis(){
     <h1 class="title">Analýza</h1>
     <p class="subtle">Backtesting · self-verification (Monte-Carlo simulace na aktuálním skenu)</p>
 
+    <div id="accuracyStatBox"></div>
+
     <div class="analysis-card">
       <h3>Monte-Carlo · ${mc.n} value pozic</h3>
       <div class="stat-grid">
@@ -1733,6 +1797,29 @@ function renderAnalysis(){
   requestAnimationFrame(()=>{
     document.querySelectorAll('#panel-2 [data-w]').forEach(s=>{ s.style.width = s.dataset.w + '%'; });
   });
+  fillAccuracyStatBox();
+}
+async function fillAccuracyStatBox(){
+  const box = document.getElementById('accuracyStatBox');
+  if(!box || !SUPABASE_CONFIGURED) return;
+  try{
+    const { data, error } = await supabase.from('recommendation_log').select('result, recommended_outcome').not('result','is',null);
+    if(error || !data) return;
+    if(!data.length){
+      box.innerHTML = `<div class="analysis-card"><h3>🎯 Přesnost doporučení appky</h3><p class="subtle" style="margin:0;">Appka zatím sbírá první výsledky — jakmile se odehraje pár zápasů, uvidíš tu, jak často appka trefila.</p></div>`;
+      return;
+    }
+    const hits = data.filter(r=>r.result===r.recommended_outcome).length;
+    const pct = Math.round(hits/data.length*100);
+    box.innerHTML = `<div class="analysis-card">
+      <h3>🎯 Přesnost doporučení appky</h3>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v" style="color:${pct>=50?'var(--emerald)':'var(--gold)'}">${pct}%</div><div class="l">Trefeno</div></div>
+        <div class="stat-box"><div class="v">${hits}/${data.length}</div><div class="l">Zápasů vyhodnoceno</div></div>
+      </div>
+      <p class="subtle" style="margin:8px 0 0;">Počítáno z doporučení appky (nejpravděpodobnější výsledek), zapsaného ještě PŘED výkopem — appka si tip nemůže zpětně "opravit".</p>
+    </div>`;
+  }catch(e){ /* tichý fail, appka funguje i bez téhle statistiky */ }
 }
 
 /* ============================= PANEL 3: RADAR ============================= */
@@ -1774,6 +1861,52 @@ function renderRadar(){
 }
 
 /* ============================= PANEL 4: MOJE SÁZKY ============================= */
+function renderSettings(){
+  const el = document.getElementById('panel-7');
+  if(!el) return;
+  const kellyMode = getKellyMode();
+  const walletLog = loadWalletLog();
+  const pushState = window.__precyzPushState || 'unknown'; // 'unsupported' | 'denied' | 'subscribed' | 'off'
+
+  el.innerHTML = `
+    <h1 class="title">Nastavení</h1>
+
+    <div class="section-lbl">Styl sázení</div>
+    <div class="group-toggle" style="margin-bottom:8px;">
+      ${Object.entries(KELLY_MODES).map(([key,m])=>`<button class="${kellyMode===key?'active':''}" onclick="setKellyMode('${key}')">${m.label}</button>`).join('')}
+    </div>
+    <p class="subtle" style="margin-bottom:20px;">Ovlivňuje, jak agresivně appka počítá doporučený vklad (frakční Kelly) na kartách zápasů i v Moje sázky.</p>
+
+    <div class="section-lbl">Oznámení</div>
+    <div class="note-box" style="margin-bottom:20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <b style="color:var(--text);">Push notifikace</b>
+          <p style="margin:4px 0 0; font-size:12.5px; color:var(--text-2); line-height:1.5;">Appka tě upozorní na nový tip appky nebo blížící se zápas, i když appku máš zavřenou.</p>
+        </div>
+        <button class="btn-primary" style="width:auto; padding:9px 16px; font-size:12.5px; flex-shrink:0;" onclick="togglePushNotifications()" id="pushToggleBtn">${pushState==='subscribed' ? 'Zapnuto ✓' : 'Zapnout'}</button>
+      </div>
+      <div id="pushStatusNote" style="font-size:11.5px; color:var(--text-3); margin-top:8px;"></div>
+    </div>
+
+    <div class="section-lbl">Historie peněženky</div>
+    ${walletLog.length===0 ? `<div class="empty-state"><div class="big">📒</div><div class="t">Zatím žádné pohyby</div>Jakmile appku začneš používat, uvidíš tu vklady, výhry i ruční úpravy.</div>` :
+      `<div class="analysis-card" style="max-height:280px; overflow-y:auto;">
+        ${walletLog.slice(0,50).map(e=>`
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--stroke);">
+            <div>
+              <div style="font-size:12.5px;">${e.reason}</div>
+              <div style="font-size:11px; color:var(--text-3);">${bookmakerLabel(e.book)} · ${new Date(e.at).toLocaleString('cs-CZ')}</div>
+            </div>
+            <div class="mono" style="font-weight:700; color:${e.delta>=0?'var(--emerald)':'var(--red)'}; flex-shrink:0;">${e.delta>=0?'+':''}${fmtCzk(e.delta)}</div>
+          </div>
+        `).join('')}
+      </div>`
+    }
+  `;
+  updatePushStatusDisplay();
+}
+
 function renderMyBets(){
   const el = document.getElementById('panel-4');
   const total = totalBankroll();
@@ -1817,11 +1950,11 @@ function renderMyBets(){
       <div class="wallet" style="--wc:var(--red)"><div class="nm">Betano</div><input type="number" value="${bankroll.betano}" onchange="updateWallet('betano', this.value)"></div>
     </div>
 
-    <div class="section-lbl">Styl sázení</div>
-    <div class="group-toggle" style="margin-bottom:8px;">
-      ${Object.entries(KELLY_MODES).map(([key,m])=>`<button class="${kellyMode===key?'active':''}" onclick="setKellyMode('${key}')">${m.label}</button>`).join('')}
+    <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Styl sázení</span>
+      <button class="pill" onclick="setActiveTab(7)" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
     </div>
-    <div class="safety-note">🛡️ Pojistka (${kellyInfo.label.toLowerCase()}): max. ${fmtCzk(total*kellyInfo.cap)} na jednu sázku (${Math.round(kellyInfo.cap*100)} % pokladny, frakční Kelly ${kellyInfo.frac}×).</div>
+    <div class="safety-note">🛡️ Aktuálně: <b>${kellyInfo.label}</b> — max. ${fmtCzk(total*kellyInfo.cap)} na jednu sázku (${Math.round(kellyInfo.cap*100)} % pokladny, frakční Kelly ${kellyInfo.frac}×).</div>
 
     <div class="section-lbl">Výkonnost</div>
     <div class="perf-grid">
@@ -1885,11 +2018,13 @@ async function cancelBet(betId){
   const b = bets.find(x=>x.id===betId);
   if(!b || b.status!=='open') return;
   bankroll[b.book] += b.stake; // vrátit vklad
+  logWalletChange(b.book, b.stake, 'Vráceno (zrušená sázka): ' + b.match);
   saveBankroll(bankroll);
   bets = bets.filter(x=>x.id!==betId);
   saveBets(bets);
   renderMyBets();
   renderCalendar();
+  updateSettleBadge();
   try{
     await supabase.from('bets').delete().eq('id', 'bet_' + currentUser.id + '_' + betId);
   }catch(e){ console.debug('[Precyz] failed to remove cancelled bet from shared table:', e && e.message); }
@@ -1897,10 +2032,27 @@ async function cancelBet(betId){
 }
 window.cancelBet = cancelBet;
 function updateWallet(key, val){
-  bankroll[key] = Math.max(0, Math.round(Number(val)||0));
+  const before = bankroll[key];
+  const after = Math.max(0, Math.round(Number(val)||0));
+  const delta = after - before;
+  bankroll[key] = after;
   saveBankroll(bankroll);
   renderMyBets();
+  if(delta !== 0) logWalletChange(key, delta, 'Ruční úprava zůstatku');
 }
+async function logWalletChange(book, delta, reason){
+  const entry = { book, delta, reason, at: new Date().toISOString() };
+  const log = loadWalletLog();
+  log.unshift(entry);
+  saveWalletLog(log.slice(0, 200)); // stačí posledních 200 záznamů lokálně
+  if(SUPABASE_CONFIGURED && currentUser){
+    try{
+      await supabase.from('wallet_history').insert({ uid: currentUser.id, email: currentProfile.email, book, delta, reason });
+    }catch(e){ console.debug('[Precyz] wallet history sync failed:', e && e.message); }
+  }
+}
+function loadWalletLog(){ try{ return JSON.parse(localStorage.getItem('precyz_wallet_log_v1')||'[]'); }catch(e){ return []; } }
+function saveWalletLog(log){ try{ localStorage.setItem('precyz_wallet_log_v1', JSON.stringify(log)); }catch(e){} }
 function pnlChartSvg(){
   const settled = bets.filter(b=>b.status!=='open');
   if(settled.length===0){
@@ -2426,6 +2578,7 @@ async function placeBet(matchId){
   const odds = bestBook(m, outcome).odds; // nejlepší dostupný kurz — appka nepředstírá, že zná přesný kurz konkrétní tvé kanceláře
   bankroll[book] -= stake;
   saveBankroll(bankroll);
+  logWalletChange(book, -stake, 'Vsazeno: ' + m.home_team + ' vs ' + m.away_team);
   const bet = {
     id:'bet_'+Date.now(),
     matchId, match:m.home_team+' vs '+m.away_team,
@@ -2453,6 +2606,7 @@ async function settleBet(betId, result){
   if(result==='win'){
     const payout = Math.round(b.stake*b.odds);
     bankroll[b.book] += payout;
+    logWalletChange(b.book, payout, 'Výhra: ' + b.match);
     b.pnl = payout - b.stake;
     b.status='win';
     fireConfetti();
@@ -2463,6 +2617,7 @@ async function settleBet(betId, result){
   saveBankroll(bankroll);
   saveBets(bets);
   renderMyBets();
+  updateSettleBadge();
   fsSyncBet(b);
   showToast(
     result==='win' ? `Vyhráno! +${fmtCzk(b.pnl)} (${b.match})` : `Prohráno: ${fmtCzk(b.pnl)} (${b.match})`,
@@ -2706,10 +2861,27 @@ function renderAll(){
   renderMyBets();
   renderCalendar();
   renderLeaderboard();
+  renderSettings();
   if(currentProfile && currentProfile.role === 'admin') renderAdminPanel();
   countUp();
   updateValueBadge();
+  updateSettleBadge();
   requestAnimationFrame(()=>positionThumb(state.tab));
+}
+function updateSettleBadge(){
+  const badge = document.getElementById('settleBadge');
+  if(!badge) return;
+  const readyToSettle = bets.filter(b=>{
+    if(b.status!=='open') return false;
+    const match = MATCHES.find(m=>m.id===b.matchId);
+    return match ? matchLikelyFinished(match) : true; // zápas zmizel z appky = pravděpodobně už dávno skončil
+  });
+  if(readyToSettle.length > 0){
+    badge.textContent = readyToSettle.length > 9 ? '9+' : String(readyToSettle.length);
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 function updateValueBadge(){
   const badge = document.getElementById('valueBadge');
@@ -2730,6 +2902,89 @@ function markValueSeen(){
 }
 
 /* count-up animation for KPI values on first paint */
+/* ============================= PUSH NOTIFIKACE ============================= */
+const VAPID_PUBLIC_KEY = "BHUWuLTMRBfTEPfxjnzIPibL0MYeGJHrTUbrtXiVupMCpmzC9-6r3mAIaEQ2gO-ItzjJCd9I6CVh8kU0LAoHc5U";
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+async function registerServiceWorker(){
+  if(!('serviceWorker' in navigator)) { window.__precyzPushState = 'unsupported'; return; }
+  try{
+    await navigator.serviceWorker.register('sw.js');
+  }catch(e){ console.debug('[Precyz] SW registration failed:', e && e.message); }
+}
+async function refreshPushState(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){ window.__precyzPushState = 'unsupported'; return; }
+  if(Notification.permission === 'denied'){ window.__precyzPushState = 'denied'; return; }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    window.__precyzPushState = sub ? 'subscribed' : 'off';
+  }catch(e){ window.__precyzPushState = 'off'; }
+}
+function updatePushStatusDisplay(){
+  const note = document.getElementById('pushStatusNote');
+  const btn = document.getElementById('pushToggleBtn');
+  if(!note || !btn) return;
+  const state = window.__precyzPushState;
+  const messages = {
+    unsupported: 'Tenhle prohlížeč push notifikace nepodporuje.',
+    denied: 'Oznámení jsou zablokovaná v nastavení prohlížeče/telefonu — appka to sama nemůže obejít.',
+    subscribed: 'Aktivní na tomhle zařízení.',
+    off: 'Zatím vypnuto.',
+    unknown: '',
+  };
+  note.textContent = messages[state] || '';
+  btn.textContent = state==='subscribed' ? 'Zapnuto ✓' : 'Zapnout';
+  btn.disabled = state==='unsupported' || state==='denied';
+  btn.style.opacity = btn.disabled ? '.5' : '1';
+}
+window.togglePushNotifications = async function(){
+  if(window.__precyzPushState === 'subscribed'){
+    try{
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if(sub){
+        await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        await sub.unsubscribe();
+      }
+      window.__precyzPushState = 'off';
+      showToast('Oznámení vypnuta.');
+    }catch(e){ showToast('Nepodařilo se vypnout oznámení.', 'error'); }
+    updatePushStatusDisplay();
+    return;
+  }
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){
+      window.__precyzPushState = perm === 'denied' ? 'denied' : 'off';
+      updatePushStatusDisplay();
+      return;
+    }
+    await registerServiceWorker();
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    const json = sub.toJSON();
+    await supabase.from('push_subscriptions').upsert({
+      uid: currentUser.id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth,
+    }, { onConflict: 'endpoint' });
+    window.__precyzPushState = 'subscribed';
+    showToast('Oznámení zapnuta na tomhle zařízení.');
+  }catch(e){
+    console.debug('[Precyz] push subscribe failed:', e && e.message);
+    showToast('Nepodařilo se zapnout oznámení.', 'error');
+  }
+  updatePushStatusDisplay();
+};
+
 /* ============================= PWA INSTALL PROMPT ============================= */
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e)=>{
