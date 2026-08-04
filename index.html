@@ -1195,7 +1195,8 @@ function mapDbRowToMatch(row){
     live: !!row.live,
     hasDraw: !!row.has_draw,
     source: row.source,
-    updated_at: row.updated_at
+    updated_at: row.updated_at,
+    research_note: row.research_note || null
   };
 }
 
@@ -2164,6 +2165,12 @@ function openModal(id){
       </table>
     </div>
     ${m.source==='real-api' ? `<p class="subtle" style="margin-top:-8px; margin-bottom:14px;">Živá data z mezinárodních kurzových kanceláří — vsadit ale samozřejmě můžeš u kteréhokoliv ze svých tří účtů níž.</p>` : ''}
+    ${m.research_note ? `
+      <div class="note-box" style="margin-bottom:16px;">
+        <b style="color:var(--text);">🔍 Proč tenhle odhad</b>
+        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${m.research_note}</p>
+      </div>
+    ` : ''}
 
     <div class="stat-grid">
       <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${bookmakerLabel(m._best.book)})</div></div>
