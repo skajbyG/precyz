@@ -1496,10 +1496,10 @@ function renderOverview(){
 
     <div class="section-lbl">Přehled dne</div>
     <div class="kpi-row">
-      <div class="kpi"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></div>
-      <div class="kpi"><div class="val mono" style="color:var(--emerald)">${fmtPct(bestEv)}</div><div class="lbl">Nejlepší value</div></div>
-      <div class="kpi"><div class="val mono" style="color:var(--gold)">${fmtPct(avgEv)}</div><div class="lbl">Průměrné EV</div></div>
-      <div class="kpi"><div class="val mono">${fmtCzk(recStake)}</div><div class="lbl">Doporučený vklad</div></div>
+      <button class="kpi" onclick="setActiveTab(1)"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></button>
+      <button class="kpi" onclick="${heroMatch && valueOnes.length ? `openModal('${heroMatch.id}')` : `setActiveTab(1)`}"><div class="val mono" style="color:var(--emerald)">${fmtPct(bestEv)}</div><div class="lbl">Nejlepší value</div></button>
+      <button class="kpi" onclick="setActiveTab(1)"><div class="val mono" style="color:var(--gold)">${fmtPct(avgEv)}</div><div class="lbl">Průměrné EV</div></button>
+      <button class="kpi" onclick="setActiveTab(4)"><div class="val mono">${fmtCzk(recStake)}</div><div class="lbl">Doporučený vklad</div></button>
     </div>
 
     ${heroMatch ? `
