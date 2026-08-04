@@ -1197,7 +1197,8 @@ function mapDbRowToMatch(row){
     source: row.source,
     updated_at: row.updated_at,
     research_note: row.research_note || null,
-    over_under: row.over_under || null
+    over_under: row.over_under || null,
+    cards_over_under: row.cards_over_under || null
   };
 }
 
@@ -2183,7 +2184,7 @@ function openModal(id){
     })()}
     ${m.over_under ? `
       <div class="note-box" style="margin-bottom:16px;">
-        <b style="color:var(--text);">⚽ Over/Under ${m.over_under.line}</b>
+        <b style="color:var(--text);">⚽ Góly — Over/Under ${m.over_under.line}</b>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
             <div style="font-weight:700;">Over ${m.over_under.line}</div>
@@ -2194,6 +2195,23 @@ function openModal(id){
             <div class="mono" style="color:var(--text-2);">${(m.over_under.under*100).toFixed(0)}%</div>
           </div>
         </div>
+      </div>
+    ` : ''}
+    ${m.cards_over_under ? `
+      <div class="note-box" style="margin-bottom:16px; ${m.cards_over_under.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+        <b style="color:var(--text);">🟨 Karty — Over/Under ${m.cards_over_under.line}</b>
+        ${m.cards_over_under.low_confidence ? `<div style="font-size:11px; color:var(--gold); margin-top:2px;">⚠️ Nízká spolehlivost — teprve 2 odehraná kola sezóny</div>` : ''}
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Over ${m.cards_over_under.line}</div>
+            <div class="mono" style="color:var(--text-2);">${(m.cards_over_under.over*100).toFixed(0)}%</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Under ${m.cards_over_under.line}</div>
+            <div class="mono" style="color:var(--text-2);">${(m.cards_over_under.under*100).toFixed(0)}%</div>
+          </div>
+        </div>
+        ${m.cards_over_under.note ? `<p style="margin:8px 0 0; font-size:12px; line-height:1.5; color:var(--text-2);">${m.cards_over_under.note}</p>` : ''}
       </div>
     ` : ''}
     ${m.research_note ? `
