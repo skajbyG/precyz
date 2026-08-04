@@ -598,6 +598,7 @@ button:focus-visible, input:focus-visible{
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17L9 11L13 15L21 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6H21V12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div class="wordmark"><span class="money">precyz</span><span class="dollar">$</span></div>
+      <span id="seasonalBadge" style="font-size:16px; margin-left:2px;"></span>
     </div>
     <div class="header-right">
       <div class="clock mono" id="clock">--:--:--</div>
@@ -893,6 +894,7 @@ async function handleAuthedUser(user){
   if(!isRootAdmin) watchOwnAccess(email); // the root admin's access is hardcoded, nothing to watch
   renderAll();
   maybeShowWelcome();
+  applySeasonalTheme();
   if(isIOS()) setTimeout(maybeShowInstallHint, 2000);
 }
 window.handleAuthedUser = handleAuthedUser;
@@ -2337,6 +2339,65 @@ async function settleBet(betId, result){
   );
 }
 window.settleBet = settleBet;
+/* ============================= SEZÓNNÍ VZHLED ============================= */
+// Appka podle aktuálního data jemně promítne roční období/příležitost do vzhledu —
+// žádné vynucování, žádné "vrať se zítra" mechaniky, jen hezký detail.
+function getSeasonalTheme(){
+  const now = new Date();
+  const m = now.getMonth(); // 0=leden
+  const d = now.getDate();
+
+  if(m===11 && d>=24 && d<=26) return { key:'vanoce', emoji:'🎄', particle:'❄️', particleCount:22, greeting:'Veselé Vánoce! 🎄' };
+  if((m===11 && d>=31) || (m===0 && d<=1)) return { key:'novyrok', emoji:'🎆', particle:'✨', particleCount:26, greeting:'Šťastný nový rok! 🎆', burst:true };
+  if(m===11 || (m===0 && d<=6)) return { key:'zima', emoji:'❄️', particle:'❄️', particleCount:14, greeting:null };
+  if(m===9 && d>=20 || (m===10 && d<=10)) return { key:'podzim', emoji:'🍂', particle:'🍂', particleCount:12, greeting:null };
+  if(m===7 && d<=15) return { key:'sezona', emoji:'⚽', particle:null, particleCount:0, greeting:'Appka odstartovala sledování nové sezóny ⚽' };
+  return null;
+}
+function applySeasonalTheme(){
+  const theme = getSeasonalTheme();
+  const badge = document.getElementById('seasonalBadge');
+  if(badge) badge.textContent = theme ? theme.emoji : '';
+  if(!theme) return;
+
+  // jemné padající částice na pozadí — pár kusů, ne zahlcující, jednou vytvořené a nechané běžet
+  if(theme.particle && !document.getElementById('seasonalParticles')){
+    const container = document.createElement('div');
+    container.id = 'seasonalParticles';
+    container.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:1; overflow:hidden;';
+    for(let i=0;i<theme.particleCount;i++){
+      const p = document.createElement('span');
+      const startX = Math.random()*100;
+      const size = 12 + Math.random()*10;
+      const dur = 10 + Math.random()*12;
+      const delay = Math.random()*dur;
+      const drift = (Math.random()-0.5)*80;
+      p.textContent = theme.particle;
+      p.style.cssText = `position:absolute; left:${startX}%; top:-5%; font-size:${size}px; opacity:.5;`;
+      p.animate([
+        { transform:'translate(0,0) rotate(0deg)', offset:0 },
+        { transform:`translate(${drift}px, 110vh) rotate(${Math.random()>0.5?360:-360}deg)`, offset:1 }
+      ], { duration:dur*1000, delay:-delay*1000, iterations:Infinity, easing:'linear' });
+      container.appendChild(p);
+    }
+    document.body.appendChild(container);
+  }
+
+  // jednorázová hláška — jednou za den na sezónu, ne při každém otevření appky
+  if(theme.greeting){
+    const seenKey = 'precyz_season_seen_' + theme.key + '_' + localDateStr(new Date());
+    try{
+      if(!localStorage.getItem(seenKey)){
+        localStorage.setItem(seenKey, '1');
+        setTimeout(()=>{
+          showToast(theme.greeting);
+          if(theme.burst) fireConfetti();
+        }, 900);
+      }
+    }catch(e){}
+  }
+}
+
 function fireConfetti(){
   const colors = ['#ffbe72','#63d6a0','#009E73','#0072B2','#CC79A7'];
   const count = 32;
