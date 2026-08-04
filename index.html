@@ -1196,7 +1196,8 @@ function mapDbRowToMatch(row){
     hasDraw: !!row.has_draw,
     source: row.source,
     updated_at: row.updated_at,
-    research_note: row.research_note || null
+    research_note: row.research_note || null,
+    over_under: row.over_under || null
   };
 }
 
@@ -1398,6 +1399,9 @@ function matchCardHtml(m){
     const lbl = o==='home' ? '1' : (o==='draw' ? 'X' : '2');
     oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.odds.toFixed(2)}</span></div>`;
   });
+  const pickEntries = Object.entries(m.our_probabilities);
+  const [pickOutcome, pickP] = pickEntries.reduce((a,b)=> b[1]>a[1] ? b : a);
+  const pickLabel = pickOutcome==='home' ? m.home_team : pickOutcome==='draw' ? 'Remíza' : m.away_team;
   return `
   <div class="card" style="--accent:${meta.color}" onclick="openModal('${m.id}')">
     <div class="card-top">
@@ -1407,7 +1411,7 @@ function matchCardHtml(m){
     <div class="card-teams">${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
     <div class="tag-row">
       <span class="tag ${tier}">${tierLabel(tier)}</span>
-      ${tier!=='skip' ? `<span class="tag ghost">${fmtPct(m._best.ev)} EV</span>` : ''}
+      ${tier!=='skip' ? `<span class="tag ghost">${fmtPct(m._best.ev)} EV</span>` : `<span class="tag ghost">👉 ${pickLabel} (${(pickP*100).toFixed(0)}%)</span>`}
       <span class="tag ghost">conf ${m.confidence.score}</span>
     </div>
     <div class="odds-row">${oddsHtml}</div>
@@ -2165,6 +2169,33 @@ function openModal(id){
       </table>
     </div>
     ${m.source==='real-api' ? `<p class="subtle" style="margin-top:-8px; margin-bottom:14px;">Živá data z mezinárodních kurzových kanceláří — vsadit ale samozřejmě můžeš u kteréhokoliv ze svých tří účtů níž.</p>` : ''}
+    ${(() => {
+      // Doporučení = nejpravděpodobnější výsledek podle appky, NEZÁVISLE na tom, jestli je proti kurzu "value".
+      // "Value" (EV) říká, jestli se vyplatí vsadit PENÍZE; tohle říká, čemu appka věří, že se stane.
+      const entries = Object.entries(m.our_probabilities);
+      const [topOutcome, topP] = entries.reduce((a,b)=> b[1]>a[1] ? b : a);
+      const label = topOutcome==='home' ? m.home_team : topOutcome==='draw' ? 'Remíza' : m.away_team;
+      const strength = topP>=0.55 ? 'Jasné' : topP>=0.4 ? 'Mírné' : 'Slabé';
+      return `<div class="note-box" style="margin-bottom:16px; border-color:rgba(99,214,160,.35);">
+        <b style="color:var(--emerald);">👉 Doporučení appky: ${label}</b>
+        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}</p>
+      </div>`;
+    })()}
+    ${m.over_under ? `
+      <div class="note-box" style="margin-bottom:16px;">
+        <b style="color:var(--text);">⚽ Over/Under ${m.over_under.line}</b>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Over ${m.over_under.line}</div>
+            <div class="mono" style="color:var(--text-2);">${(m.over_under.over*100).toFixed(0)}%</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Under ${m.over_under.line}</div>
+            <div class="mono" style="color:var(--text-2);">${(m.over_under.under*100).toFixed(0)}%</div>
+          </div>
+        </div>
+      </div>
+    ` : ''}
     ${m.research_note ? `
       <div class="note-box" style="margin-bottom:16px;">
         <b style="color:var(--text);">🔍 Proč tenhle odhad</b>
