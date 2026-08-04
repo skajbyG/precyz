@@ -309,11 +309,23 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .stat-box{background:var(--surface); border:1px solid var(--stroke); border-radius:14px; padding:12px; text-align:center;}
 .stat-box .v{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px;}
 .stat-box .l{font-size:10px; color:var(--text-2); margin-top:2px;}
-.bet-form{background:var(--surface); border:1px solid var(--stroke); border-radius:16px; padding:16px;}
-.bet-form-row{display:flex; gap:8px; margin-bottom:10px;}
+.bet-form{background:var(--surface); border:1px solid var(--stroke); border-radius:16px; padding:18px;}
+.bet-form-row{display:flex; gap:10px; margin-bottom:12px;}
+.bet-field{flex:1; min-width:0;}
+.bet-field label{display:block; font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px;}
 .bet-form select, .bet-form input{
-  flex:1; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text); border-radius:10px; padding:9px 10px; font-size:16px; font-family:inherit;
+  flex:1; width:100%; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text); border-radius:10px; padding:11px 12px; font-size:16px; font-family:inherit; transition:border-color .2s;
 }
+.bet-form select{
+  appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%23a89e91' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center; background-size:16px; padding-right:34px;
+  cursor:pointer;
+}
+.bet-form select:focus, .bet-form input:focus{ outline:none; border-color:var(--gold); }
+.stake-input-wrap{ position:relative; }
+.stake-input-wrap input{ padding-right:38px; }
+.stake-input-wrap .suffix{ position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--text-3); font-weight:600; pointer-events:none; }
 .btn-primary{
   width:100%; padding:12px; border-radius:12px; background:linear-gradient(135deg,var(--gold),var(--teal));
   color:#1a1006; font-weight:700; font-size:14px; transition:transform .2s var(--spring), box-shadow .2s;
@@ -2269,17 +2281,29 @@ function openModal(id){
     </div>
 
     <div class="bet-form">
-      <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">＋ Vsadit tip</div>
+      <div style="font-weight:700; font-size:14px; margin-bottom:14px;">＋ Vsadit tip</div>
       <div class="bet-form-row">
-        <select id="betOutcome">${betOptions}</select>
+        <div class="bet-field">
+          <label for="betOutcome">Výběr</label>
+          <select id="betOutcome">${betOptions}</select>
+        </div>
       </div>
       <div class="bet-form-row">
-        <select id="betBook">
-          <option value="tipsport">Tipsport</option>
-          <option value="fortuna">Fortuna</option>
-          <option value="betano">Betano</option>
-        </select>
-        <input type="number" id="betStake" value="${kelly>0?kelly:100}" min="10" placeholder="Vklad Kč">
+        <div class="bet-field">
+          <label for="betBook">Peněženka</label>
+          <select id="betBook">
+            <option value="tipsport">🟢 Tipsport</option>
+            <option value="fortuna">🔴 Fortuna</option>
+            <option value="betano">🟡 Betano</option>
+          </select>
+        </div>
+        <div class="bet-field">
+          <label for="betStake">Vklad</label>
+          <div class="stake-input-wrap">
+            <input type="number" id="betStake" value="${kelly>0?kelly:100}" min="10">
+            <span class="suffix">Kč</span>
+          </div>
+        </div>
       </div>
       <button class="btn-primary" onclick="placeBet('${m.id}')">Vsadit</button>
     </div>
