@@ -2211,15 +2211,56 @@ window.showHelpModal = function(){
       <p style="margin-bottom:6px;">• Nesnaž se "dohnat ztrátu" vyšší sázkou.</p>
       <p style="margin-bottom:16px;">• Zápasy tu budou i zítra — není důvod spěchat.</p>
 
-      <div class="note-box" style="margin-bottom:0;">
+      <div class="note-box" style="margin-bottom:16px;">
         <b style="color:var(--text);">Kam se obrátit (ČR):</b><br>
         Linka pomoci pro hráče hazardních her — anonymní, zdarma, nonstop: <b style="color:var(--text);">+420 777 477 877</b><br>
         Národní linka pro odvykání hraní (Úřad vlády ČR): <b style="color:var(--text);">800 350 000</b> (po–pá 10–18 h), chciodvykat.cz<br>
         Rejstřík vyloučených osob: dobrovolné vyloučení ze všech legálních sázkovek v ČR — zodpovednehrani.cz
       </div>
+
+      <h3 style="color:var(--text); font-size:14px; margin-bottom:8px;">🔧 Diagnostika přihlášení</h3>
+      <p style="margin-bottom:10px;">Pokud tě appka opakovaně odhlašuje, klikni na tlačítko níže a pošli mi (Danielovi), co appka ukáže.</p>
+      <button class="btn-primary" style="background:transparent; border:1px solid var(--stroke-2); color:var(--text); margin-bottom:10px;" onclick="runDiagnostics()">Zkontrolovat uložené přihlášení</button>
+      <div id="diagOutput" class="mono" style="font-size:11px; background:var(--surface-2); border-radius:10px; padding:10px; white-space:pre-wrap; display:none; word-break:break-all;"></div>
     </div>
   `;
   document.getElementById('modalOverlay').classList.add('open');
+};
+window.runDiagnostics = function(){
+  const out = document.getElementById('diagOutput');
+  out.style.display = 'block';
+  const lines = [];
+  try{
+    const testKey = '__precyz_ls_test__';
+    localStorage.setItem(testKey, '1');
+    const canWrite = localStorage.getItem(testKey) === '1';
+    localStorage.removeItem(testKey);
+    lines.push('localStorage zápis funguje: ' + (canWrite ? 'ANO' : 'NE'));
+  }catch(e){
+    lines.push('localStorage zápis SELHAL: ' + e.message);
+  }
+  try{
+    const allKeys = Object.keys(localStorage);
+    const authKey = allKeys.find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    lines.push('Klíč přihlášení nalezen: ' + (authKey ? 'ANO (' + authKey + ')' : 'NE'));
+    if(authKey){
+      const raw = localStorage.getItem(authKey);
+      lines.push('Délka uložených dat: ' + (raw ? raw.length : 0) + ' znaků');
+      try{
+        const parsed = JSON.parse(raw);
+        const exp = parsed.expires_at ? new Date(parsed.expires_at*1000).toLocaleString('cs-CZ') : 'neznámé';
+        lines.push('Access token vyprší: ' + exp);
+        lines.push('Refresh token uložen: ' + (parsed.refresh_token ? 'ANO' : 'NE'));
+      }catch(e2){
+        lines.push('Data se nepodařilo přečíst jako platný token: ' + e2.message);
+      }
+    }
+  }catch(e){
+    lines.push('Čtení localStorage SELHALO: ' + e.message);
+  }
+  lines.push('Prohlížeč: ' + navigator.userAgent);
+  lines.push('Soukromý režim / standalone appka: ' + (window.matchMedia('(display-mode: standalone)').matches ? 'ANO (nainstalovaná appka)' : 'NE (běžná karta)'));
+  out.textContent = lines.join('\n');
 };
 window.showPrivacyModal = function(){
   document.getElementById('modalBody').innerHTML = `
