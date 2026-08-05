@@ -277,6 +277,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .tag.medium{background:rgba(255,190,114,.15); color:var(--gold);}
 .tag.low{background:rgba(180,168,154,.15); color:var(--text-2);}
 .tag.skip{background:rgba(255,138,111,.10); color:var(--text-3);}
+.tag.research{background:rgba(185,167,255,.15); color:var(--arb);}
 .tag.ghost{background:var(--surface-2); color:var(--text-2);}
 .odds-row{display:flex; gap:8px;}
 .card-freshness{font-size:10.5px; color:var(--text-3); margin-top:8px;}
@@ -1367,7 +1368,7 @@ async function loadMatchesFromDb(){
     const { data, error } = await supabase.from('matches').select('*').eq('archived', false).order('start_time');
     if(error) throw error;
     MATCHES = (data || []).map(mapDbRowToMatch);
-    MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
+    MATCHES.forEach(assignTier);
     MOCK_LB = buildMockLeaderboard();
     captureClosingOdds();
     logRecommendations();
@@ -1385,7 +1386,7 @@ async function loadArchivedMatchesForCalendar(){
     const { data, error } = await supabase.from('matches').select('*').eq('archived', true).gte('start_time', cutoff).order('start_time');
     if(error) throw error;
     ARCHIVED_MATCHES = (data || []).map(mapDbRowToMatch);
-    ARCHIVED_MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
+    ARCHIVED_MATCHES.forEach(assignTier);
     renderCalendar();
   }catch(e){
     console.debug('[Precyz] archived matches load failed:', e && e.message);
@@ -1475,7 +1476,17 @@ function tierOf(ev){
   return 'skip';
 }
 function tierLabel(t){
-  return {high:'Vysoká',medium:'Střední',low:'Nízká',skip:'Bez value'}[t];
+  return {high:'Vysoká',medium:'Střední',low:'Nízká',skip:'Bez value',research:'Odhad appky'}[t];
+}
+// Appka umí spočítat skutečnou "value" (EV proti trhu) jen u zápasů se skutečným
+// kurzem od reálné kurzové kanceláře (source: 'real-api'). U ručně dohledaných
+// zápasů (verified-manual) appka svůj vlastní kurz sama vyrábí z vlastního odhadu
+// pravděpodobnosti — porovnávat to samo se sebou by bylo předstírané, ne skutečná
+// value. Takové zápasy appka poctivě řadí do zvlášť kategorie "Odhad appky".
+function hasRealMarket(m){ return m.source === 'real-api'; }
+function assignTier(m){
+  m._best = bestMarketForMatch(m);
+  m._tier = hasRealMarket(m) ? tierOf(m._best.ev) : 'research';
 }
 const KELLY_MODES = {
   conservative: { frac: 0.15, cap: 0.03, label: 'Opatrný' },
@@ -1610,7 +1621,7 @@ function matchCardHtml(m){
   let oddsHtml = '';
   outcomes.forEach(o=>{
     const best = bestBook(m,o);
-    const isBest = o===bestOutcome && tier!=='skip';
+    const isBest = o===bestOutcome && tier!=='skip' && tier!=='research';
     const lbl = o==='home' ? '1' : (o==='draw' ? 'X' : '2');
     oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.odds.toFixed(2)}</span></div>`;
   });
@@ -1628,7 +1639,7 @@ function matchCardHtml(m){
     <div class="card-teams">${derby ? '🔥 ' : ''}${m.home_team} <span class="vs">vs</span> ${m.away_team}</div>
     <div class="tag-row">
       <span class="tag ${tier}">${tierLabel(tier)}</span>
-      ${tier!=='skip' ? `<span class="tag ghost">${fmtPct(m._best.ev)} EV</span>` : `<span class="tag ghost">👉 ${pickLabel} (${(pickP*100).toFixed(0)}%)</span>`}
+      ${tier!=='skip' && tier!=='research' ? `<span class="tag ghost">${fmtPct(m._best.ev)} EV</span>` : `<span class="tag ghost">👉 ${pickLabel} (${(pickP*100).toFixed(0)}%)</span>`}
       <span class="tag ghost">conf ${m.confidence.score}</span>
     </div>
     <div class="odds-row">${oddsHtml}</div>
@@ -1648,12 +1659,22 @@ function renderOverview(){
   counts.arbitrage = 0;
 
   const scanned = MATCHES.length;
-  const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
-  const bestEv = valueOnes.length ? Math.max(...valueOnes.map(m=>m._best.ev)) : 0;
-  const avgEv = valueOnes.length ? valueOnes.reduce((s,m)=>s+m._best.ev,0)/valueOnes.length : 0;
-  const recStake = valueOnes.length ? Math.round(valueOnes.reduce((s,m)=>s+kellyStakeCzk(totalBankroll(), m._best.p, m._best.odds),0)/valueOnes.length) : 0;
+  // Skutečná value (EV proti reálnému trhu) a "jen odhad appky" appka teď drží
+  // striktně odděleně — u druhé skupiny appka nemá reálný kurz, takže EV číslo
+  // by bylo appka porovnávající samu sebe se sebou, ne se skutečným trhem.
+  const realValueOnes = MATCHES.filter(m=>m._tier!=='skip' && m._tier!=='research');
+  const researchOnes = MATCHES.filter(m=>m._tier==='research');
+  const bestEv = realValueOnes.length ? Math.max(...realValueOnes.map(m=>m._best.ev)) : 0;
+  const avgEv = realValueOnes.length ? realValueOnes.reduce((s,m)=>s+m._best.ev,0)/realValueOnes.length : 0;
+  const recStake = realValueOnes.length ? Math.round(realValueOnes.reduce((s,m)=>s+kellyStakeCzk(totalBankroll(), m._best.p, m._best.odds),0)/realValueOnes.length) : 0;
 
-  const heroMatch = valueOnes.slice().sort((a,b)=>b._best.ev-a._best.ev)[0] || MATCHES[0] || null;
+  // Hero: appka nejdřív zkusí najít skutečnou value; když žádná neexistuje (typický
+  // stav, dokud appka nesleduje ligu s reálnými kurzy), padne na nejjistější
+  // výzkumný odhad — poctivě označený jako odhad appky, ne jako "value".
+  const heroMatch = realValueOnes.slice().sort((a,b)=>b._best.ev-a._best.ev)[0]
+    || researchOnes.slice().sort((a,b)=>b.confidence.score-a.confidence.score)[0]
+    || MATCHES[0] || null;
+  const heroIsRealValue = heroMatch && realValueOnes.includes(heroMatch);
   let barHtml = '', legendHtml = '';
   if(heroMatch){
     const hp = heroMatch.our_probabilities;
@@ -1663,7 +1684,8 @@ function renderOverview(){
     legendHtml = outcomes.map(o=>`<span>${o==='home'?'1':o==='draw'?'X':'2'} · ${(hp[o]*100).toFixed(0)}%</span>`).join('');
   }
 
-  const topValue = valueOnes.slice().sort((a,b)=>b._best.ev-a._best.ev).slice(0,3);
+  const topValue = realValueOnes.slice().sort((a,b)=>b._best.ev-a._best.ev).slice(0,3);
+  const topResearch = researchOnes.slice().sort((a,b)=>b.confidence.score-a.confidence.score).slice(0,3);
 
   el.innerHTML = `
     <h1 class="title">Na co chceš sázet?</h1>
@@ -1681,18 +1703,19 @@ function renderOverview(){
     <div class="section-lbl">Přehled dne</div>
     <div class="kpi-row">
       <button class="kpi" onclick="setActiveTab(1)"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></button>
-      <button class="kpi" onclick="${heroMatch && valueOnes.length ? `openModal('${heroMatch.id}')` : `setActiveTab(1)`}"><div class="val mono" style="color:var(--emerald)">${fmtPct(bestEv)}</div><div class="lbl">Nejlepší value</div></button>
-      <button class="kpi" onclick="setActiveTab(1)"><div class="val mono" style="color:var(--gold)">${fmtPct(avgEv)}</div><div class="lbl">Průměrné EV</div></button>
-      <button class="kpi" onclick="setActiveTab(4)"><div class="val mono">${fmtCzk(recStake)}</div><div class="lbl">Doporučený vklad</div></button>
+      <button class="kpi" onclick="${heroMatch ? `openModal('${heroMatch.id}')` : `setActiveTab(1)`}"><div class="val mono" style="color:var(--emerald)">${realValueOnes.length ? fmtPct(bestEv) : '—'}</div><div class="lbl">Nejlepší value</div></button>
+      <button class="kpi" onclick="setActiveTab(1)"><div class="val mono" style="color:var(--gold)">${realValueOnes.length ? fmtPct(avgEv) : '—'}</div><div class="lbl">Průměrné EV</div></button>
+      <button class="kpi" onclick="setActiveTab(4)"><div class="val mono">${realValueOnes.length ? fmtCzk(recStake) : '—'}</div><div class="lbl">Doporučený vklad</div></button>
     </div>
 
     ${heroMatch ? `
     <div class="hero-tip" onclick="openModal('${heroMatch.id}')" onkeydown="if(event.key==='Enter'||event.key===' ') openModal('${heroMatch.id}')" style="cursor:pointer;" role="button" tabindex="0">
-      <div class="eyebrow">Tip dne <span style="opacity:.6; font-weight:400; text-transform:none; letter-spacing:0;">— klikni pro detail ›</span></div>
+      <div class="eyebrow">${heroIsRealValue ? 'Tip dne' : 'Odhad appky'} <span style="opacity:.6; font-weight:400; text-transform:none; letter-spacing:0;">— klikni pro detail ›</span></div>
       <div class="teams">${heroMatch.home_team} vs ${heroMatch.away_team}</div>
-      <div class="meta">${COUNTRY[heroMatch.country].flag} ${heroMatch.league} · ${fmtDate(heroMatch.start_time)} ${fmtTime(heroMatch.start_time)} · doporučení: <b>${outcomeLabel(heroMatch.sport, heroMatch._best.outcome, heroMatch)}</b> @ ${heroMatch._best.odds.toFixed(2)} (${bookmakerLabel(heroMatch._best.book)})</div>
+      <div class="meta">${COUNTRY[heroMatch.country].flag} ${heroMatch.league} · ${fmtDate(heroMatch.start_time)} ${fmtTime(heroMatch.start_time)} · doporučení: <b>${outcomeLabel(heroMatch.sport, heroMatch._best.outcome, heroMatch)}</b>${heroIsRealValue ? ` @ ${heroMatch._best.odds.toFixed(2)} (${bookmakerLabel(heroMatch._best.book)})` : ''}</div>
       <div class="prob-bar">${barHtml}</div>
       <div class="prob-legend">${legendHtml}</div>
+      ${!heroIsRealValue ? `<p class="subtle" style="margin:10px 0 0;">🔍 Appka na tenhle zápas nemá reálný kurz — tohle je výzkumný odhad, ne matematická value.</p>` : ''}
     </div>
     ` : `
     <div class="empty-state" style="margin-bottom:24px;">
@@ -1702,10 +1725,15 @@ function renderOverview(){
     </div>
     `}
 
-    <div class="section-lbl">Top value sázky</div>
-    <div class="match-grid">
-      ${topValue.length ? topValue.map(safeMatchCardHtml).join('') : `<div class="empty-state"><div class="big">🔍</div><div class="t">Zatím žádná value</div>Radši nic než špatně — model dnes nenašel jasnou hranu.</div>`}
-    </div>
+    ${topValue.length ? `
+      <div class="section-lbl">Top value sázky</div>
+      <div class="match-grid">${topValue.map(safeMatchCardHtml).join('')}</div>
+    ` : ''}
+    ${topResearch.length ? `
+      <div class="section-lbl">🔍 Nejjistější odhady appky <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-3);">(bez reálného kurzu, appka nepočítá value)</span></div>
+      <div class="match-grid">${topResearch.map(safeMatchCardHtml).join('')}</div>
+    ` : ''}
+    ${!topValue.length && !topResearch.length ? `<div class="empty-state"><div class="big">🔍</div><div class="t">Zatím nic ve skenu</div>Radši nic než špatně.</div>` : ''}
   `;
   requestAnimationFrame(()=>{
     document.querySelectorAll('.prob-bar span[data-w]').forEach(s=>{ s.style.width = s.dataset.w + '%'; });
@@ -1765,7 +1793,8 @@ function setGroup(g){ state.group=g; renderCategoryDetail(document.getElementByI
 /* ============================= PANEL 1: VALUE ============================= */
 function renderValue(){
   const el = document.getElementById('panel-1');
-  const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
+  const valueOnes = MATCHES.filter(m=>m._tier!=='skip' && m._tier!=='research');
+  const researchCount = MATCHES.filter(m=>m._tier==='research').length;
   const bySport = {};
   valueOnes.forEach(m=>{ bySport[m.sport]=(bySport[m.sport]||0)+1; });
   let filtered = state.valueFilter==='all' ? valueOnes : valueOnes.filter(m=>m.sport===state.valueFilter);
@@ -1789,7 +1818,8 @@ function renderValue(){
 
   el.innerHTML = `
     <h1 class="title">Value sázky</h1>
-    <p class="subtle">Jen zápasy, kde model vidí skutečnou hranu nad trhem (EV ≥ 5 %).</p>
+    <p class="subtle">Jen zápasy se skutečným kurzem od reálné kurzové kanceláře, kde appka najde matematickou výhodu (EV ≥ 5 %) — žádná porovnání appky se sebou samou.</p>
+    ${researchCount>0 ? `<div class="note-box" style="margin-bottom:16px; border-color:rgba(185,167,255,.35);"><span style="color:var(--arb);">🔍 ${researchCount} ${researchCount===1?'zápas má':'zápasů má'} appka jen jako výzkumný odhad</span> — appka na ně nemá reálný kurz, takže "value" nejde poctivě spočítat. Najdeš je v záložce <b style="color:var(--text);">Kolo</b> nebo přímo v Přehledu.</div>` : ''}
     <div class="pill-row">
       <button class="pill ${state.valueFilter==='all'?'active':''}" onclick="setValueFilter('all')">Vše (${valueOnes.length})</button>
       ${Object.entries(SPORT_META).filter(([k])=>k!=='arbitrage').map(([k,mm])=>`
@@ -1813,7 +1843,7 @@ function renderValue(){
     </div>
     ${search || state.valueFilter!=='all' ? `<p class="results-count">${filtered.length} ${filtered.length===1?'výsledek':filtered.length>=2&&filtered.length<=4?'výsledky':'výsledků'}</p>` : ''}
     <div class="match-grid">
-      ${filtered.length ? filtered.map(safeMatchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>${search ? 'Pro tohle hledání nic nenašli.' : 'Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.'}</div>`}
+      ${filtered.length ? filtered.map(safeMatchCardHtml).join('') : `<div class="empty-state"><div class="big">🕊️</div><div class="t">Radši nic než špatně</div>${search ? 'Pro tohle hledání nic nenašli.' : (researchCount>0 ? 'Appka teď nesleduje žádnou ligu s reálnými kurzy — všechny zápasy má jen jako výzkumný odhad. Podívej se do záložky Kolo.' : 'Pro tento filtr dnes žádná value neexistuje. Nefabrikujeme tipy — čekáme na skutečnou hranu.')}</div>`}
     </div>
   `;
 }
@@ -1840,34 +1870,36 @@ window.setValueSort = setValueSort;
 /* ============================= PANEL 2: ANALÝZA ============================= */
 function monteCarlo(matches){
   // simplified simulation summary based on average EV/edge
-  const withEdge = matches.filter(m=>m._tier!=='skip');
-  const n = withEdge.length || 1;
+  const withEdge = matches.filter(m=>m._tier!=='skip' && m._tier!=='research');
+  const realCount = withEdge.length;
+  const n = realCount || 1;
   const avgP = withEdge.reduce((s,m)=>s+m._best.p,0)/n;
   const winProb = Math.min(95, Math.round(avgP*100 + 4));
   const roi = withEdge.reduce((s,m)=>s+m._best.ev,0)/n;
   const expPnl = Math.round(totalBankroll()*0.05*roi*n);
-  return {winProb, roi, expPnl, n};
+  return {winProb, roi, expPnl, n: realCount};
 }
 
 function renderAnalysis(){
   const el = document.getElementById('panel-2');
   const mc = monteCarlo(MATCHES);
-  const sample = MATCHES.filter(m=>m._tier!=='skip').slice(0,6);
+  const sample = MATCHES.filter(m=>m._tier!=='skip' && m._tier!=='research').slice(0,6);
 
   el.innerHTML = `
     <h1 class="title">Analýza</h1>
-    <p class="subtle">Backtesting · self-verification (Monte-Carlo simulace na aktuálním skenu)</p>
+    <p class="subtle">Monte-Carlo simulace nad aktuálním skenem — dopředný odhad, ne test proti historii. Skutečnou přesnost appky (proti reálným výsledkům) najdeš níž v „Appka vs Ty".</p>
 
     <div id="accuracyStatBox"></div>
 
     <div class="analysis-card">
       <h3>Monte-Carlo · ${mc.n} value pozic</h3>
+      ${mc.n === 0 ? `<p class="subtle" style="margin:0;">Appka teď nemá žádnou skutečnou value pozici k simulaci — až se objeví zápas s reálným kurzem a matematickou výhodou, simulace se tu spočítá.</p>` : `
       <div class="stat-grid">
         <div class="stat-box"><div class="v" style="color:var(--emerald)">${mc.winProb}%</div><div class="l">Šance na profit</div></div>
         <div class="stat-box"><div class="v" style="color:var(--gold)">${fmtPct(mc.roi)}</div><div class="l">Očekávané ROI</div></div>
         <div class="stat-box"><div class="v">${fmtCzk(mc.expPnl)}</div><div class="l">Očekávaný P/L</div></div>
       </div>
-      <div class="mc-bar"><span data-w="${mc.winProb}" style="width:0%"></span></div>
+      <div class="mc-bar"><span data-w="${mc.winProb}" style="width:0%"></span></div>`}
       <p class="subtle" style="margin:8px 0 0">Distribuce simulovaných výsledků při 1000 běhách nad aktuálním portfoliem value sázek, frakční Kelly 0.25×, strop 5 % bankrollu na pozici.</p>
     </div>
 
@@ -1942,34 +1974,21 @@ async function fillAccuracyStatBox(){
 function renderRadar(){
   const el = document.getElementById('panel-3');
   const sharpCompared = MATCHES.length;
-  const sharpValue = MATCHES.filter(m=>m._tier!=='skip');
-  const eloSignals = MATCHES.filter(m=>m._tier==='high');
+  const sharpValue = MATCHES.filter(m=>m._tier!=='skip' && m._tier!=='research');
+  const researchCount = MATCHES.filter(m=>m._tier==='research').length;
 
   el.innerHTML = `
     <h1 class="title">Radar příležitostí</h1>
-    <p class="subtle">Tři nezávislé signály. Zobrazí se jen to, co reálně existuje.</p>
+    <p class="subtle">Appka tady ukazuje jen to, co umí skutečně spočítat — žádné předstírané metody.</p>
 
     <div class="radar-block">
-      <div class="radar-head" style="color:var(--arb)">💎 Arbitráž</div>
-      <div class="empty-state" style="padding:30px;">
-        <div class="big">💎</div>
-        <div class="t">Dnes 0 jistých kombinací</div>
-        Porovnáno napříč Tipsport / Fortuna / Betano — sleduju rozdíly, jistý zisk (Σ 1/kurz &lt; 1) se dnes neobjevil.
-      </div>
-    </div>
-
-    <div class="radar-block">
-      <div class="radar-head" style="color:var(--emerald)">📐 Value proti ostré knize</div>
-      <p class="subtle" style="margin-bottom:12px;">Porovnáno ${sharpCompared} zápasů proti no-vig ceně Pinnacle/Betfair jako referenci trhu.</p>
+      <div class="radar-head" style="color:var(--emerald)">📐 Skutečná value (proti reálným kurzům)</div>
+      <p class="subtle" style="margin-bottom:12px;">${sharpCompared} zápasů ve skenu, z toho appka umí spočítat matematickou výhodu jen tam, kde má reálný kurz od skutečné kurzové kanceláře.</p>
       ${sharpValue.length ? `<div class="match-grid">${sharpValue.slice(0,6).map(safeMatchCardHtml).join('')}</div>` :
-      `<div class="empty-state"><div class="big">🛡️</div><div class="t">Porovnáno ${sharpCompared} zápasů, žádná value</div>Chrání tě to před sázením se záporným EV.</div>`}
+      `<div class="empty-state"><div class="big">🛡️</div><div class="t">${researchCount>0 ? `Appka teď nesleduje žádnou ligu s reálnými kurzy (${researchCount} ${researchCount===1?'zápas má':'zápasů má'} jen výzkumný odhad)` : 'Žádná value se dnes neobjevila'}</div>Appka si radši nevymýšlí value tam, kde ji nemá jak ověřit.</div>`}
     </div>
 
-    <div class="radar-block">
-      <div class="radar-head" style="color:var(--gold)">📡 Model signál (ELO)</div>
-      ${eloSignals.length ? `<div class="match-grid">${eloSignals.map(safeMatchCardHtml).join('')}</div>` : `<p class="subtle">Žádný silný ELO signál nad trhem.</p>`}
-      <div class="warn-box">⚠️ Model signál je experimentální a NEOVĚŘENÝ proti historii. Ber ho jako doplňkový, nikoli hlavní zdroj rozhodování.</div>
-    </div>
+    <div class="warn-box">⚠️ Appka nemá vlastní ELO model ani nezávislé srovnání proti "ostrým" knihám (Pinnacle/Betfair) — dřív appka tuhle sekci takhle popisovala, ale ve skutečnosti to nedělala. Value výš je spočítaná jen tam, kde appka má reálný kurz uložený u zápasu (viz "Zdroj: real-api" v detailu).</div>
 
     <div class="section-lbl">Ve skenu · ${MATCHES.length} zápasů</div>
     <div class="match-grid">${MATCHES.map(safeMatchCardHtml).join('')}</div>
@@ -2263,7 +2282,7 @@ function dayHasDot(dateStr){
   if(dayBets.some(b=>b.status==='lose')) dots.push('#D55E00'); // vermillion — distinguishable from green even for red-green colorblindness
   if(dayBets.some(b=>b.status==='open')) dots.push('#F0E442'); // yellow
   const dayMatches = calendarMatches().filter(m=>m.date_key===dateStr);
-  if(dayMatches.some(m=>m._tier!=='skip')) dots.push('#0072B2'); // blue
+  if(dayMatches.some(m=>m._tier!=='skip' && m._tier!=='research')) dots.push('#0072B2'); // blue
   if(dayMatches.length) dots.push('#CC79A7'); // reddish purple
   if(eventsFor(dateStr).length) dots.push('#E69F00'); // orange
   return dots;
@@ -2300,7 +2319,7 @@ function renderRound(){
             <span class="round-card-time">${fmtTime(m.start_time)}</span>
           </div>
           <div class="round-card-teams">${derby?'🔥 ':''}${m.home_team} <span class="vs">–</span> ${m.away_team}</div>
-          <div class="round-card-pick">👉 <b>${topLabel}</b> <span class="mono" style="color:var(--text-3);">(${(topP*100).toFixed(0)} %)</span>${m._tier && m._tier!=='skip' ? ` · <span style="color:var(--emerald);">${fmtPct(m._best.ev)} EV</span>` : ''}</div>
+          <div class="round-card-pick">👉 <b>${topLabel}</b> <span class="mono" style="color:var(--text-3);">(${(topP*100).toFixed(0)} %)</span>${m._tier && m._tier!=='skip' && m._tier!=='research' ? ` · <span style="color:var(--emerald);">${fmtPct(m._best.ev)} EV</span>` : ''}</div>
           ${m.top_pick ? `<div class="round-card-star">⭐ ${m.top_pick.label}</div>` : ''}
           ${m.research_key_point ? `<div class="round-card-note">${m.research_key_point}</div>` : ''}
         </div>
@@ -2686,10 +2705,10 @@ function openModalInner(id){
       ${m.source==='real-api' ? `<p class="subtle" style="margin-top:-8px; margin-bottom:14px;">Živá data z mezinárodních kurzových kanceláří — vsadit ale samozřejmě můžeš u kteréhokoliv ze svých tří účtů níž.</p>` : ''}
       <div class="note-box" style="margin-bottom:16px; border-color:rgba(99,214,160,.35);">
         <b style="color:var(--emerald);">👉 Doporučení appky: ${topLabel}</b>
-        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}</p>
+        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}${m._tier==='research' ? 'Appka na tenhle zápas nemá reálný kurz od kurzové kanceláře, takže "value" (EV) tu nejde poctivě spočítat — je to jen výzkumný odhad.' : ''}</p>
       </div>
       <div class="stat-grid">
-        <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${bookmakerLabel(m._best.book)})</div></div>
+        <div class="stat-box"><div class="v" style="color:${m._tier!=='skip' && m._tier!=='research' ?'var(--emerald)':'var(--text-2)'}">${m._tier==='research' ? '—' : fmtPct(m._best.ev)}</div><div class="l">${m._tier==='research' ? 'EV (bez reálného kurzu)' : `EV (${bookmakerLabel(m._best.book)})`}</div></div>
         <div class="stat-box"><div class="v">${(m._best.p*100).toFixed(0)}%</div><div class="l">Naše pravděpodobnost</div></div>
         <div class="stat-box"><div class="v">${fmtCzk(kelly)}</div><div class="l">Kelly vklad (0.25×)</div></div>
       </div>
@@ -2926,7 +2945,7 @@ const LOSE_COMMENTS = [
 function updateAppMood(){
   const badge = document.getElementById('moodBadge');
   if(!badge) return;
-  const valueOnes = MATCHES.filter(m=>m._tier!=='skip');
+  const valueOnes = MATCHES.filter(m=>m._tier!=='skip' && m._tier!=='research');
   const avgEv = valueOnes.length ? valueOnes.reduce((s,m)=>s+m._best.ev,0)/valueOnes.length : 0;
   let mood;
   if(valueOnes.length === 0) mood = { emoji:'🧘', label:'Trpělivá', title:'Appka teď nevidí žádnou value — vyčkává, ne fabrikuje tipy.' };
@@ -3196,7 +3215,7 @@ function updateValueBadge(){
   if(!badge) return;
   let lastSeen = 0;
   try{ lastSeen = Number(localStorage.getItem('precyz_value_lastseen_v1') || 0); }catch(e){}
-  const newCount = MATCHES.filter(m => m._tier!=='skip' && m.updated_at && new Date(m.updated_at).getTime() > lastSeen).length;
+  const newCount = MATCHES.filter(m => m._tier!=='skip' && m._tier!=='research' && m.updated_at && new Date(m.updated_at).getTime() > lastSeen).length;
   if(newCount > 0){
     badge.textContent = newCount > 9 ? '9+' : String(newCount);
     badge.style.display = '';
