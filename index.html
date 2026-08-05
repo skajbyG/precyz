@@ -1341,15 +1341,31 @@ function mapDbRowToMatch(row){
 async function loadMatchesFromDb(){
   if(!SUPABASE_CONFIGURED) return;
   try{
-    const { data, error } = await supabase.from('matches').select('*').order('start_time');
+    const { data, error } = await supabase.from('matches').select('*').eq('archived', false).order('start_time');
     if(error) throw error;
     MATCHES = (data || []).map(mapDbRowToMatch);
     MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
     MOCK_LB = buildMockLeaderboard();
     captureClosingOdds();
     logRecommendations();
+    loadArchivedMatchesForCalendar();
   }catch(e){
     console.debug('[Precyz] matches load failed:', e && e.message);
+  }
+}
+// Odehrané zápasy appka po pár hodinách archivuje (ne maže) — Value/Přehled je
+// nepotřebují, ale Kalendář má ukazovat i historii, ne jen budoucí zápasy.
+let ARCHIVED_MATCHES = [];
+async function loadArchivedMatchesForCalendar(){
+  try{
+    const cutoff = new Date(Date.now() - 60*24*60*60*1000).toISOString(); // posledních 60 dní stačí
+    const { data, error } = await supabase.from('matches').select('*').eq('archived', true).gte('start_time', cutoff).order('start_time');
+    if(error) throw error;
+    ARCHIVED_MATCHES = (data || []).map(mapDbRowToMatch);
+    ARCHIVED_MATCHES.forEach(m=>{ m._best = bestMarketForMatch(m); m._tier = tierOf(m._best.ev); });
+    renderCalendar();
+  }catch(e){
+    console.debug('[Precyz] archived matches load failed:', e && e.message);
   }
 }
 // Zapíše aktuální "tip appky" pro zápasy, co ještě nezačaly — jednou zapsáno se
@@ -2204,13 +2220,23 @@ const SPECIAL_EVENTS = [
 ];
 function eventsFor(dateStr){ return SPECIAL_EVENTS.filter(e=>e.date_key===dateStr); }
 
+function calendarMatches(){
+  const seen = new Set();
+  const combined = [];
+  for(const m of [...MATCHES, ...ARCHIVED_MATCHES]){
+    if(seen.has(m.id)) continue;
+    seen.add(m.id);
+    combined.push(m);
+  }
+  return combined;
+}
 function dayHasDot(dateStr){
   const dots = [];
   const dayBets = bets.filter(b=> (b.date_key || (b.date && b.date.slice(0,10))) === dateStr);
   if(dayBets.some(b=>b.status==='win')) dots.push('#009E73');  // bluish green
   if(dayBets.some(b=>b.status==='lose')) dots.push('#D55E00'); // vermillion — distinguishable from green even for red-green colorblindness
   if(dayBets.some(b=>b.status==='open')) dots.push('#F0E442'); // yellow
-  const dayMatches = MATCHES.filter(m=>m.date_key===dateStr);
+  const dayMatches = calendarMatches().filter(m=>m.date_key===dateStr);
   if(dayMatches.some(m=>m._tier!=='skip')) dots.push('#0072B2'); // blue
   if(dayMatches.length) dots.push('#CC79A7'); // reddish purple
   if(eventsFor(dateStr).length) dots.push('#E69F00'); // orange
@@ -2322,7 +2348,7 @@ function calNext(){ state.calMonth++; if(state.calMonth>11){state.calMonth=0; st
 function calToday(){ const d=new Date(); state.calMonth=d.getMonth(); state.calYear=d.getFullYear(); renderCalendar(); }
 function selectDay(dateStr){ state.calSelectedDay = dateStr; renderCalendar(); }
 function renderDayDetail(dateStr){
-  const dayMatches = MATCHES.filter(m=>m.date_key===dateStr);
+  const dayMatches = calendarMatches().filter(m=>m.date_key===dateStr);
   const dayBets = bets.filter(b=>(b.date_key || (b.date && b.date.slice(0,10)))===dateStr);
   const dayEvents = eventsFor(dateStr);
   const d = new Date(dateStr);
