@@ -263,21 +263,21 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .card:hover{transform:translateY(-5px); border-color:var(--stroke-2); box-shadow:0 14px 30px -12px rgba(0,0,0,.5);}
 .card:hover::after{content:''; position:absolute; top:-30%; right:-30%; width:60%; height:60%; border-radius:50%;
   background:radial-gradient(circle, rgba(255,255,255,.06), transparent 70%); pointer-events:none;}
-.card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
-.card-league{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-2);}
+.card-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px;}
+.card-league{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-2); min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
 .sport-sq{width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; background:var(--surface-2);}
-.card-time{font-size:11.5px; color:var(--text-2); font-family:'JetBrains Mono',monospace;}
+.card-time{font-size:11.5px; color:var(--text-2); font-family:'JetBrains Mono',monospace; flex-shrink:0;}
 .card-time.live{color:var(--red); display:flex; align-items:center; gap:5px; font-weight:700;}
 .live-dot{width:6px; height:6px; border-radius:50%; background:var(--red); animation:pulse 1.2s infinite;}
 .card-teams{font-size:15.5px; font-weight:700; margin-bottom:10px; line-height:1.35;}
 .card-teams .vs{color:var(--text-3); font-weight:400; font-size:12px;}
 .tag-row{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;}
-.tag{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:99px; letter-spacing:.2px;}
-.tag.high{background:rgba(99,214,160,.15); color:var(--emerald);}
-.tag.medium{background:rgba(255,190,114,.15); color:var(--gold);}
-.tag.low{background:rgba(180,168,154,.15); color:var(--text-2);}
-.tag.skip{background:rgba(255,138,111,.10); color:var(--text-3);}
-.tag.research{background:rgba(185,167,255,.15); color:var(--arb);}
+.tag{font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:99px; letter-spacing:.2px; position:relative; z-index:1;}
+.tag.high{background:#1c3b30; color:var(--emerald);}
+.tag.medium{background:#3d2f18; color:var(--gold);}
+.tag.low{background:#2a2620; color:var(--text-2);}
+.tag.skip{background:#3a2420; color:var(--text-3);}
+.tag.research{background:#2a2540; color:var(--arb);}
 .tag.ghost{background:var(--surface-2); color:var(--text-2);}
 .odds-row{display:flex; gap:8px;}
 .card-freshness{font-size:10.5px; color:var(--text-3); margin-top:8px;}
@@ -1298,6 +1298,7 @@ const COUNTRY = {
   IE:{flag:'🇮🇪',name:'Irsko',order:10}, BG:{flag:'🇧🇬',name:'Bulharsko',order:11},
   TR:{flag:'🇹🇷',name:'Turecko',order:12}, GR:{flag:'🇬🇷',name:'Řecko',order:13},
   ES:{flag:'🇪🇸',name:'Španělsko',order:14}, IT:{flag:'🇮🇹',name:'Itálie',order:15},
+  FR:{flag:'🇫🇷',name:'Francie',order:15.5},
   BR:{flag:'🇧🇷',name:'Brazílie',order:16}, AR:{flag:'🇦🇷',name:'Argentina',order:17},
   PE:{flag:'🇵🇪',name:'Peru',order:18}, EU:{flag:'🇪🇺',name:'Evropa',order:19},
   SA:{flag:'🌎',name:'Jižní Amerika',order:20}, FRIENDLY:{flag:'🏳️',name:'Přátelák',order:21},
@@ -1457,8 +1458,13 @@ function bestBook(match, outcome){
 function evFor(match, outcome){
   const best = bestBook(match, outcome);
   const p = match.our_probabilities[outcome];
-  const ev = p*best.odds - 1;
-  return {ev, odds:best.odds, book:best.book, p};
+  // Appka nedůvěřuje "value" na extrémních outsiderech (< 10% pravděpodobnosti).
+  // Většinou jde o zápasy velkého klubu s mužstvem z nižší soutěže (přípravné
+  // zápasy, poháry) mylně zařazené pod ligu — jedna štědrá kancelář tam vytvoří
+  // fingovaně vysoké EV, co ve skutečnosti jen odráží tenký, nespolehlivý trh.
+  const reliable = p >= 0.10;
+  const ev = reliable ? (p*best.odds - 1) : -1;
+  return {ev, odds:best.odds, book:best.book, p, unreliable: !reliable};
 }
 function bestMarketForMatch(match){
   const outcomes = match.hasDraw ? ['home','draw','away'] : ['home','away'];
@@ -2007,10 +2013,10 @@ function onboardingChecklistHtml(){
 function onboardingChecklistHtmlInner(){
   try{ if(localStorage.getItem('precyz_onboarding_dismissed_v1')) return ''; }catch(e){}
   const items = [
-    { done: window.__precyzPushState === 'subscribed', label: 'Zapnout push oznámení', action: `setActiveTab(7); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
-    { done: isStandalone(), label: 'Nainstalovat appku na plochu', action: `showToast('Na iPhonu: Sdílet → Přidat na plochu. Na Androidu appka nabídku ukáže sama.')` },
-    { done: (()=>{ try{ return !!localStorage.getItem('precyz_kelly_mode_v1'); }catch(e){ return false; } })(), label: 'Zvolit styl sázení', action: `document.querySelector('.group-toggle')?.scrollIntoView({behavior:'smooth', block:'center'})` },
-    { done: (()=>{ try{ return !!localStorage.getItem('precyz_viewed_help_v1'); }catch(e){ return false; } })(), label: 'Přečíst si, jak appka funguje', action: `showHelpModal()` },
+    { done: window.__precyzPushState === 'subscribed', label: '📲 Zapnout push oznámení', action: `setActiveTab(7); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: isStandalone(), label: '🏠 Nainstalovat appku na plochu', action: `showToast('Na iPhonu: Sdílet → Přidat na plochu. Na Androidu appka nabídku ukáže sama.')` },
+    { done: (()=>{ try{ return !!localStorage.getItem('precyz_kelly_mode_v1'); }catch(e){ return false; } })(), label: '🎯 Zvolit styl sázení', action: `document.querySelector('.group-toggle')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: (()=>{ try{ return !!localStorage.getItem('precyz_viewed_help_v1'); }catch(e){ return false; } })(), label: '📖 Přečíst si, jak appka funguje', action: `showHelpModal()` },
   ];
   const doneCount = items.filter(i=>i.done).length;
   if(doneCount === items.length){
