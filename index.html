@@ -307,6 +307,9 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .modal h2{font-size:20px; margin-bottom:4px;}
 .modal .subrow{font-size:12.5px; color:var(--text-2); margin-bottom:18px;}
 .odds-table-wrap{width:100%; overflow-x:auto; margin-bottom:18px; -webkit-overflow-scrolling:touch;}
+.modal-tabs{display:flex; gap:6px; margin-bottom:16px; background:var(--surface-2); border-radius:12px; padding:4px; overflow-x:auto;}
+.modal-tab{flex:1; padding:9px 8px; border-radius:9px; font-size:12.5px; font-weight:700; color:var(--text-2); white-space:nowrap; transition:background .2s, color .2s;}
+.modal-tab.active{background:var(--gold); color:#1a1006;}
 .odds-table{width:100%; min-width:340px; border-collapse:collapse; font-size:13px;}
 .odds-table th{text-align:left; font-size:10.5px; color:var(--text-3); text-transform:uppercase; padding:6px 8px; letter-spacing:.5px;}
 .odds-table td{padding:9px 8px; border-top:1px solid var(--stroke); font-family:'JetBrains Mono',monospace;}
@@ -1334,7 +1337,13 @@ function mapDbRowToMatch(row){
     updated_at: row.updated_at,
     research_note: row.research_note || null,
     over_under: row.over_under || null,
-    cards_over_under: row.cards_over_under || null
+    cards_over_under: row.cards_over_under || null,
+    btts: row.btts || null,
+    corners_ou: row.corners_ou || null,
+    research_fears: row.research_fears || null,
+    research_confidence: row.research_confidence || null,
+    research_key_point: row.research_key_point || null,
+    top_pick: row.top_pick || null
   };
 }
 
@@ -2488,14 +2497,15 @@ function openModal(id){
     showToast('Tenhle zápas se nepodařilo zobrazit — zkus to prosím znovu.', 'error');
   }
 }
+window.switchModalTab = function(tab){
+  document.querySelectorAll('.modal-tab').forEach(b=>b.classList.toggle('active', b.dataset.mtab===tab));
+  document.querySelectorAll('.modal-tab-panel').forEach(p=>{ p.style.display = p.dataset.mpanel===tab ? '' : 'none'; });
+};
 function openModalInner(id){
   const m = MATCHES.find(x=>x.id===id);
   if(!m) return;
   const meta = SPORT_META[m.sport];
   const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
-  // Kurzové kanceláře k porovnání — dynamicky podle toho, co má tenhle zápas skutečně
-  // k dispozici (ruční ověřená data mají Tipsport/Fortuna/Betano, data z reálného API
-  // mají skutečné mezinárodní kurzové kanceláře). Max 4 sloupce, ať se to vejde.
   const availableBooks = Object.keys(m.bookmaker_odds || {}).slice(0, 4);
 
   let tableRows = outcomes.map(o=>{
@@ -2510,80 +2520,133 @@ function openModalInner(id){
   }).join('');
 
   const kelly = kellyStakeCzk(totalBankroll(), m._best.p, m._best.odds);
-
   const betOptions = outcomes.map(o=>{
     const best = bestBook(m,o);
     return `<option value="${o}">${o==='home'?'1 · '+m.home_team : o==='draw' ? 'X · Remíza' : '2 · '+m.away_team} @ ${best.odds.toFixed(2)}</option>`;
   }).join('');
+
+  const entries = Object.entries(m.our_probabilities);
+  const [topOutcome, topP] = entries.reduce((a,b)=> b[1]>a[1] ? b : a);
+  const topLabel = topOutcome==='home' ? m.home_team : topOutcome==='draw' ? 'Remíza' : m.away_team;
+  const strength = topP>=0.55 ? 'Jasné' : topP>=0.4 ? 'Mírné' : 'Slabé';
+
+  const ouBox = (data, title, emoji, moreExtra) => !data ? '' : `
+      <div class="note-box" style="margin-bottom:16px; ${data.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+        <b style="color:var(--text);">${emoji} ${title} ${data.line}</b>
+        ${data.low_confidence ? `<div style="font-size:11px; color:var(--gold); margin-top:2px;">⚠️ Nízká spolehlivost — málo odehraných dat</div>` : ''}
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Over ${data.line}</div>
+            <div class="mono" style="color:var(--text-2);">${(data.over*100).toFixed(0)}%</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Under ${data.line}</div>
+            <div class="mono" style="color:var(--text-2);">${(data.under*100).toFixed(0)}%</div>
+          </div>
+        </div>
+        ${moreExtra || ''}
+        ${data.note ? `<p style="margin:8px 0 0; font-size:12px; line-height:1.5; color:var(--text-2);">${data.note}</p>` : ''}
+      </div>`;
+
+  const btts = m.btts ? `
+      <div class="note-box" style="margin-bottom:16px; ${m.btts.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+        <b style="color:var(--text);">🥅 Dají gól oba týmy?</b>
+        ${m.btts.low_confidence ? `<div style="font-size:11px; color:var(--gold); margin-top:2px;">⚠️ Nízká spolehlivost — málo odehraných dat</div>` : ''}
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Ano</div>
+            <div class="mono" style="color:var(--text-2);">${(m.btts.yes*100).toFixed(0)}%</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700;">Ne</div>
+            <div class="mono" style="color:var(--text-2);">${(m.btts.no*100).toFixed(0)}%</div>
+          </div>
+        </div>
+      </div>` : '';
+
+  const cornersWinner = m.corners_ou ? `
+      <div class="note-box" style="margin-bottom:16px; ${m.corners_ou.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+        <b style="color:var(--text);">🚩 Kdo vyhraje na rohy?</b>
+        <div style="display:flex; gap:6px; margin-top:8px;">
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700; font-size:11.5px;">${m.home_team}</div>
+            <div class="mono" style="color:var(--text-2);">${((m.corners_ou.home_corners_win||0)*100).toFixed(0)}%</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700; font-size:11.5px;">Shoda</div>
+            <div class="mono" style="color:var(--text-2);">${((m.corners_ou.corners_draw||0)*100).toFixed(0)}%</div>
+          </div>
+          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
+            <div style="font-weight:700; font-size:11.5px;">${m.away_team}</div>
+            <div class="mono" style="color:var(--text-2);">${((m.corners_ou.away_corners_win||0)*100).toFixed(0)}%</div>
+          </div>
+        </div>
+      </div>` : '';
+
+  const researchHtml = (m.research_fears || m.research_confidence || m.research_key_point || m.research_note) ? `
+      <div class="note-box" style="margin-bottom:16px;">
+        <b style="color:var(--text);">🔍 Rozbor appky</b>
+        ${m.research_key_point ? `<div style="margin-top:10px;"><b style="color:var(--gold); font-size:12px;">🎯 Zásadní bod</b><p style="margin:4px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${m.research_key_point}</p></div>` : ''}
+        ${m.research_confidence ? `<div style="margin-top:10px;"><b style="color:var(--emerald); font-size:12px;">✅ Čemu věříme</b><p style="margin:4px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${m.research_confidence}</p></div>` : ''}
+        ${m.research_fears ? `<div style="margin-top:10px;"><b style="color:var(--red); font-size:12px;">⚠️ Čeho se bojíme</b><p style="margin:4px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${m.research_fears}</p></div>` : ''}
+        ${(!m.research_fears && !m.research_confidence && !m.research_key_point && m.research_note) ? `<p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${m.research_note}</p>` : ''}
+      </div>` : '';
+
+  const topPickHtml = m.top_pick ? `
+      <div class="note-box" style="margin-bottom:16px; background:linear-gradient(115deg, rgba(255,190,114,.14), rgba(185,167,255,.06)); border-color:rgba(255,190,114,.4);">
+        <b style="color:var(--gold);">⭐ Kdyby appka mohla vsadit jen jednu věc</b>
+        <p style="margin:6px 0 0; font-size:13px; font-weight:700; color:var(--text);">${m.top_pick.label}</p>
+        <p style="margin:4px 0 0; font-size:12px; line-height:1.5; color:var(--text-2);">${m.top_pick.reason}</p>
+      </div>` : '';
 
   document.getElementById('modalBody').innerHTML = `
     <button class="modal-close" onclick="closeModal()" aria-label="Zavřít">✕</button>
     <h2>${m.home_team} vs ${m.away_team}</h2>
     <div class="subrow">${COUNTRY[m.country].flag} ${m.league} · ${fmtDate(m.start_time)} ${fmtTime(m.start_time)}</div>
 
-    <div class="odds-table-wrap">
-      <table class="odds-table">
-        <tr><th>Výsledek</th>${availableBooks.map(b=>`<th>${bookmakerLabel(b)}</th>`).join('')}</tr>
-        ${tableRows}
-      </table>
-    </div>
-    ${m.source==='real-api' ? `<p class="subtle" style="margin-top:-8px; margin-bottom:14px;">Živá data z mezinárodních kurzových kanceláří — vsadit ale samozřejmě můžeš u kteréhokoliv ze svých tří účtů níž.</p>` : ''}
-    ${(() => {
-      // Doporučení = nejpravděpodobnější výsledek podle appky, NEZÁVISLE na tom, jestli je proti kurzu "value".
-      // "Value" (EV) říká, jestli se vyplatí vsadit PENÍZE; tohle říká, čemu appka věří, že se stane.
-      const entries = Object.entries(m.our_probabilities);
-      const [topOutcome, topP] = entries.reduce((a,b)=> b[1]>a[1] ? b : a);
-      const label = topOutcome==='home' ? m.home_team : topOutcome==='draw' ? 'Remíza' : m.away_team;
-      const strength = topP>=0.55 ? 'Jasné' : topP>=0.4 ? 'Mírné' : 'Slabé';
-      return `<div class="note-box" style="margin-bottom:16px; border-color:rgba(99,214,160,.35);">
-        <b style="color:var(--emerald);">👉 Doporučení appky: ${label}</b>
-        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}</p>
-      </div>`;
-    })()}
-    ${m.over_under ? `
-      <div class="note-box" style="margin-bottom:16px;">
-        <b style="color:var(--text);">⚽ Góly — Over/Under ${m.over_under.line}</b>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
-            <div style="font-weight:700;">Over ${m.over_under.line}</div>
-            <div class="mono" style="color:var(--text-2);">${(m.over_under.over*100).toFixed(0)}%</div>
-          </div>
-          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
-            <div style="font-weight:700;">Under ${m.over_under.line}</div>
-            <div class="mono" style="color:var(--text-2);">${(m.over_under.under*100).toFixed(0)}%</div>
-          </div>
-        </div>
-      </div>
-    ` : ''}
-    ${m.cards_over_under ? `
-      <div class="note-box" style="margin-bottom:16px; ${m.cards_over_under.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
-        <b style="color:var(--text);">🟨 Karty — Over/Under ${m.cards_over_under.line}</b>
-        ${m.cards_over_under.low_confidence ? `<div style="font-size:11px; color:var(--gold); margin-top:2px;">⚠️ Nízká spolehlivost — teprve 2 odehraná kola sezóny</div>` : ''}
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
-            <div style="font-weight:700;">Over ${m.cards_over_under.line}</div>
-            <div class="mono" style="color:var(--text-2);">${(m.cards_over_under.over*100).toFixed(0)}%</div>
-          </div>
-          <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
-            <div style="font-weight:700;">Under ${m.cards_over_under.line}</div>
-            <div class="mono" style="color:var(--text-2);">${(m.cards_over_under.under*100).toFixed(0)}%</div>
-          </div>
-        </div>
-        ${m.cards_over_under.note ? `<p style="margin:8px 0 0; font-size:12px; line-height:1.5; color:var(--text-2);">${m.cards_over_under.note}</p>` : ''}
-      </div>
-    ` : ''}
-    ${m.research_note ? `
-      <div class="note-box" style="margin-bottom:16px;">
-        <b style="color:var(--text);">🔍 Proč tenhle odhad</b>
-        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${m.research_note}</p>
-      </div>
-    ` : ''}
+    ${topPickHtml}
 
-    <div class="stat-grid">
-      <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${bookmakerLabel(m._best.book)})</div></div>
-      <div class="stat-box"><div class="v">${(m._best.p*100).toFixed(0)}%</div><div class="l">Naše pravděpodobnost</div></div>
-      <div class="stat-box"><div class="v">${fmtCzk(kelly)}</div><div class="l">Kelly vklad (0.25×)</div></div>
+    <div class="modal-tabs" role="tablist">
+      <button class="modal-tab active" data-mtab="result" onclick="switchModalTab('result')">Výsledek</button>
+      <button class="modal-tab" data-mtab="goals" onclick="switchModalTab('goals')">Góly</button>
+      <button class="modal-tab" data-mtab="corners" onclick="switchModalTab('corners')">Rohy</button>
+      <button class="modal-tab" data-mtab="cards" onclick="switchModalTab('cards')">Karty</button>
     </div>
+
+    <div class="modal-tab-panel" data-mpanel="result">
+      <div class="odds-table-wrap">
+        <table class="odds-table">
+          <tr><th>Výsledek</th>${availableBooks.map(b=>`<th>${bookmakerLabel(b)}</th>`).join('')}</tr>
+          ${tableRows}
+        </table>
+      </div>
+      ${m.source==='real-api' ? `<p class="subtle" style="margin-top:-8px; margin-bottom:14px;">Živá data z mezinárodních kurzových kanceláří — vsadit ale samozřejmě můžeš u kteréhokoliv ze svých tří účtů níž.</p>` : ''}
+      <div class="note-box" style="margin-bottom:16px; border-color:rgba(99,214,160,.35);">
+        <b style="color:var(--emerald);">👉 Doporučení appky: ${topLabel}</b>
+        <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v" style="color:${m._tier!=='skip'?'var(--emerald)':'var(--text-2)'}">${fmtPct(m._best.ev)}</div><div class="l">EV (${bookmakerLabel(m._best.book)})</div></div>
+        <div class="stat-box"><div class="v">${(m._best.p*100).toFixed(0)}%</div><div class="l">Naše pravděpodobnost</div></div>
+        <div class="stat-box"><div class="v">${fmtCzk(kelly)}</div><div class="l">Kelly vklad (0.25×)</div></div>
+      </div>
+    </div>
+
+    <div class="modal-tab-panel" data-mpanel="goals" style="display:none;">
+      ${ouBox(m.over_under, 'Góly — Over/Under', '⚽')}
+      ${btts || `<p class="subtle">Appka zatím nemá odhad na "dá gól i druhý tým" pro tenhle zápas.</p>`}
+    </div>
+
+    <div class="modal-tab-panel" data-mpanel="corners" style="display:none;">
+      ${m.corners_ou ? ouBox(m.corners_ou, 'Rohy — Over/Under', '🚩') : `<p class="subtle">Appka zatím pro tenhle zápas nemá spolehlivá data na rohy.</p>`}
+      ${cornersWinner}
+    </div>
+
+    <div class="modal-tab-panel" data-mpanel="cards" style="display:none;">
+      ${ouBox(m.cards_over_under, 'Karty — Over/Under', '🟨')}
+    </div>
+
+    ${researchHtml}
 
     <div class="bet-form">
       <div style="font-weight:700; font-size:14px; margin-bottom:14px;">＋ Vsadit tip</div>
