@@ -2710,8 +2710,9 @@ function openModalInner(id){
       <div class="stat-grid">
         <div class="stat-box"><div class="v" style="color:${m._tier!=='skip' && m._tier!=='research' ?'var(--emerald)':'var(--text-2)'}">${m._tier==='research' ? '—' : fmtPct(m._best.ev)}</div><div class="l">${m._tier==='research' ? 'EV (bez reálného kurzu)' : `EV (${bookmakerLabel(m._best.book)})`}</div></div>
         <div class="stat-box"><div class="v">${(m._best.p*100).toFixed(0)}%</div><div class="l">Naše pravděpodobnost</div></div>
-        <div class="stat-box"><div class="v">${fmtCzk(kelly)}</div><div class="l">Kelly vklad (0.25×)</div></div>
+        <div class="stat-box"><div class="v">${m._tier==='research' ? '—' : fmtCzk(kelly)}</div><div class="l">${m._tier==='research' ? 'Kelly (bez reál. kurzu)' : 'Kelly vklad (0.25×)'}</div></div>
       </div>
+      ${m._tier==='research' ? `<p class="subtle" style="margin-top:8px;">Kelly vklad počítá optimální sázku z ověřené výhody nad trhem — bez reálného kurzu appka nemá z čeho vycházet, takže radši neukazuje vymyšlené číslo. Vsadit můžeš i tak, jen appka nedoporučí konkrétní částku.</p>` : ''}
     </div>
 
     <div class="modal-tab-panel" data-mpanel="goals" style="display:none;">
@@ -2750,7 +2751,7 @@ function openModalInner(id){
         <div class="bet-field">
           <label for="betStake">Vklad</label>
           <div class="stake-input-wrap">
-            <input type="number" id="betStake" value="${kelly>0?kelly:100}" min="10">
+            <input type="number" id="betStake" value="${(m._tier!=='research' && kelly>0)?kelly:100}" min="10">
             <span class="suffix">Kč</span>
           </div>
         </div>
