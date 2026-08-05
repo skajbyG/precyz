@@ -280,6 +280,21 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .tag.ghost{background:var(--surface-2); color:var(--text-2);}
 .odds-row{display:flex; gap:8px;}
 .card-freshness{font-size:10.5px; color:var(--text-3); margin-top:8px;}
+
+.round-day-lbl{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--gold); margin:22px 0 10px;}
+.round-day-lbl:first-of-type{margin-top:4px;}
+.round-card{
+  background:var(--surface); border:1px solid var(--stroke); border-left:3px solid var(--accent, var(--gold));
+  border-radius:14px; padding:14px 16px; margin-bottom:10px; cursor:pointer;
+  transition:transform .2s var(--ease), border-color .2s;
+}
+.round-card:hover{ transform:translateY(-2px); border-color:var(--stroke-2); }
+.round-card-top{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-3); margin-bottom:6px;}
+.round-card-teams{font-size:14.5px; font-weight:700; margin-bottom:6px;}
+.round-card-teams .vs{color:var(--text-3); font-weight:400;}
+.round-card-pick{font-size:12.5px; color:var(--text-2); margin-bottom:4px;}
+.round-card-star{font-size:12px; color:var(--gold); font-weight:600; margin-bottom:4px;}
+.round-card-note{font-size:11.5px; color:var(--text-3); line-height:1.5;}
 .odds-cell{
   flex:1; text-align:center; background:var(--surface-2); border-radius:10px; padding:8px 4px;
   font-family:'JetBrains Mono',monospace;
@@ -677,8 +692,9 @@ button:focus-visible, input:focus-visible{
       <button class="seg-btn" data-i="3" role="tab" aria-selected="false">Radar</button>
       <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky<span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kalendář</button>
-      <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Nastavení</button>
-      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
+      <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Kolo</button>
+      <button class="seg-btn" data-i="7" role="tab" aria-selected="false">Nastavení</button>
+      <button class="seg-btn" data-i="8" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
     </div>
   </div>
 
@@ -691,6 +707,7 @@ button:focus-visible, input:focus-visible{
     <div class="panel" id="panel-5" role="tabpanel"></div>
     <div class="panel" id="panel-6" role="tabpanel"></div>
     <div class="panel" id="panel-7" role="tabpanel"></div>
+    <div class="panel" id="panel-8" role="tabpanel"></div>
   </div>
 
   <footer>
@@ -1153,7 +1170,7 @@ window.downloadBackup = async function(){
   }
 };
 async function renderAdminPanel(){
-  const el = document.getElementById('panel-7');
+  const el = document.getElementById('panel-8');
   if(!el) return;
   el.innerHTML = `<h1 class="title">Admin</h1><p class="subtle">Načítám…</p>`;
   try{
@@ -1971,7 +1988,7 @@ function onboardingChecklistHtml(){
 function onboardingChecklistHtmlInner(){
   try{ if(localStorage.getItem('precyz_onboarding_dismissed_v1')) return ''; }catch(e){}
   const items = [
-    { done: window.__precyzPushState === 'subscribed', label: 'Zapnout push oznámení', action: `setActiveTab(6); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: window.__precyzPushState === 'subscribed', label: 'Zapnout push oznámení', action: `setActiveTab(7); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
     { done: isStandalone(), label: 'Nainstalovat appku na plochu', action: `showToast('Na iPhonu: Sdílet → Přidat na plochu. Na Androidu appka nabídku ukáže sama.')` },
     { done: (()=>{ try{ return !!localStorage.getItem('precyz_kelly_mode_v1'); }catch(e){ return false; } })(), label: 'Zvolit styl sázení', action: `document.querySelector('.group-toggle')?.scrollIntoView({behavior:'smooth', block:'center'})` },
     { done: (()=>{ try{ return !!localStorage.getItem('precyz_viewed_help_v1'); }catch(e){ return false; } })(), label: 'Přečíst si, jak appka funguje', action: `showHelpModal()` },
@@ -2002,7 +2019,7 @@ window.dismissOnboarding = function(){
 };
 
 function renderSettings(){
-  const el = document.getElementById('panel-6');
+  const el = document.getElementById('panel-7');
   if(!el) return;
   const kellyMode = getKellyMode();
   const walletLog = loadWalletLog();
@@ -2096,7 +2113,7 @@ function renderMyBets(){
 
     <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Styl sázení</span>
-      <button class="pill" onclick="setActiveTab(6)" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
+      <button class="pill" onclick="setActiveTab(7)" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
     </div>
     <div class="safety-note">🛡️ Aktuálně: <b>${kellyInfo.label}</b> — max. ${fmtCzk(total*kellyInfo.cap)} na jednu sázku (${Math.round(kellyInfo.cap*100)} % pokladny, frakční Kelly ${kellyInfo.frac}×).</div>
 
@@ -2252,6 +2269,52 @@ function dayHasDot(dateStr){
   return dots;
 }
 
+function renderRound(){
+  const el = document.getElementById('panel-6');
+  if(!el) return;
+  const upcoming = MATCHES.filter(m=>m._tier || m._best).slice().sort((a,b)=> new Date(a.start_time)-new Date(b.start_time));
+
+  if(!upcoming.length){
+    el.innerHTML = `<h1 class="title">📰 Kolo</h1><div class="empty-state"><div class="big">🗞️</div><div class="t">Appka zatím nemá žádné nadcházející zápasy</div>Jakmile se objeví nové kolo, appka ho tu shrne celé na jedno místo.</div>`;
+    return;
+  }
+
+  const byDate = {};
+  upcoming.forEach(m=>{ (byDate[m.date_key] = byDate[m.date_key]||[]).push(m); });
+
+  const dayNames = ['Ne','Po','Út','St','Čt','Pá','So'];
+  const briefing = Object.entries(byDate).map(([dateKey, dayMatches])=>{
+    const d = new Date(dateKey+'T12:00:00');
+    const dateLabel = `${dayNames[d.getDay()]} ${d.getDate()}. ${d.getMonth()+1}.`;
+    const cards = dayMatches.map(m=>{
+      const entries = Object.entries(m.our_probabilities||{});
+      if(!entries.length) return '';
+      const [topOutcome, topP] = entries.reduce((a,b)=> b[1]>a[1] ? b : a);
+      const topLabel = topOutcome==='home' ? m.home_team : topOutcome==='draw' ? 'Remíza' : m.away_team;
+      const meta = SPORT_META[m.sport] || {emoji:'⚽', color:'var(--gold)'};
+      const derby = isDerby(m.home_team, m.away_team);
+      return `
+        <div class="round-card" onclick="openModal('${m.id}')" style="--accent:${meta.color}">
+          <div class="round-card-top">
+            <span class="round-card-league">${meta.emoji} ${COUNTRY[m.country] ? COUNTRY[m.country].flag : ''} ${m.league}</span>
+            <span class="round-card-time">${fmtTime(m.start_time)}</span>
+          </div>
+          <div class="round-card-teams">${derby?'🔥 ':''}${m.home_team} <span class="vs">–</span> ${m.away_team}</div>
+          <div class="round-card-pick">👉 <b>${topLabel}</b> <span class="mono" style="color:var(--text-3);">(${(topP*100).toFixed(0)} %)</span>${m._tier && m._tier!=='skip' ? ` · <span style="color:var(--emerald);">${fmtPct(m._best.ev)} EV</span>` : ''}</div>
+          ${m.top_pick ? `<div class="round-card-star">⭐ ${m.top_pick.label}</div>` : ''}
+          ${m.research_key_point ? `<div class="round-card-note">${m.research_key_point}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+    return `<div class="round-day-lbl">${dateLabel}</div>${cards}`;
+  }).join('');
+
+  el.innerHTML = `
+    <h1 class="title">📰 Kolo</h1>
+    <p class="subtle">Celé aktuální kolo appky na jednom místě — všechny tipy, hvězdičkové sázky i klíčové body k pročtení bez proklikávání.</p>
+    ${briefing}
+  `;
+}
 function renderCalendar(){
   const el = document.getElementById('panel-5');
   const y = state.calYear, m = state.calMonth;
@@ -3103,7 +3166,7 @@ setInterval(tickAge, 15000); tickAge();
 
 /* ============================= INIT ============================= */
 function renderAll(){
-  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderMyBets, renderCalendar, renderSettings, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
+  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderMyBets, renderCalendar, renderRound, renderSettings, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
   for(const step of steps){
     try{ step(); }
     catch(e){ console.debug('[Precyz] render step failed, continuing with the rest:', step.name, e && e.message); }
