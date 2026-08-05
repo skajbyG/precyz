@@ -72,6 +72,10 @@ button{font-family:inherit; cursor:pointer; border:none; background:none; color:
   background:radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(16,11,7,.6) 100%);}
 
 .app{position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column;}
+#watermarkOverlay{
+  position:fixed; inset:0; z-index:999; pointer-events:none;
+  background-repeat:repeat; opacity:.05; mix-blend-mode:difference;
+}
 
 /* header */
 header{
@@ -643,6 +647,7 @@ button:focus-visible, input:focus-visible{
 <div class="vignette"></div>
 
 <div class="app" id="mainApp" style="display:none;">
+  <div id="watermarkOverlay" aria-hidden="true"></div>
   <header>
     <div class="brand">
       <div class="logo">
@@ -754,7 +759,18 @@ if (SUPABASE_CONFIGURED) {
 
 function authGateBody(){ return document.getElementById('authGateBody'); }
 function showGate(){ document.getElementById('authGate').style.display = 'flex'; document.getElementById('mainApp').style.display = 'none'; }
-function showApp(){ document.getElementById('authGate').style.display = 'none'; document.getElementById('mainApp').style.display = ''; }
+function showApp(){ document.getElementById('authGate').style.display = 'none'; document.getElementById('mainApp').style.display = ''; applyWatermark(); }
+function applyWatermark(){
+  const el = document.getElementById('watermarkOverlay');
+  if(!el || !currentProfile) return;
+  const text = currentProfile.email + '  ·  ' + localDateStr(new Date());
+  // SVG dlaždice s otočeným textem, appka ji zopakuje přes celou plochu přes CSS background-repeat.
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='340' height='200'>
+    <text x='0' y='100' font-family='monospace' font-size='13' fill='white' transform='rotate(-28 170 100)'>${text}</text>
+  </svg>`;
+  const dataUri = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  el.style.backgroundImage = `url("${dataUri}")`;
+}
 
 function renderConfigMissing(){
   authGateBody().innerHTML = `
