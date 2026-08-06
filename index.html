@@ -687,13 +687,13 @@ button:focus-visible, input:focus-visible{
 <div class="app" id="mainApp" style="display:none;">
   <header>
     <div class="brand">
-      <div class="clock mono" id="clock" style="margin-right:4px;">--:--:--</div>
       <div class="logo">
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17L9 11L13 15L21 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6H21V12" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <div class="wordmark"><span class="money">precyz</span><span class="dollar">$</span></div>
       <span id="seasonalBadge" style="font-size:16px; margin-left:2px;"></span>
       <span id="moodBadge" style="font-size:13px; margin-left:6px; color:var(--text-2); cursor:default;"></span>
+      <div class="clock mono" id="clock" style="margin-left:10px;">--:--:--</div>
     </div>
     <div class="header-right">
       <div class="age-chip"><span class="dot-live"></span><span id="ageChip">Kurzy: před chvílí</span></div>
@@ -719,12 +719,10 @@ button:focus-visible, input:focus-visible{
       <button class="seg-btn" data-i="1" role="tab" aria-selected="false">Value<span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="2" role="tab" aria-selected="false">Analýza</button>
       <button class="seg-btn" data-i="3" role="tab" aria-selected="false">Radar</button>
-      <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky<span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
-      <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kalendář</button>
-      <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Kolo</button>
-      <button class="seg-btn" data-i="7" role="tab" aria-selected="false">Můj profil</button>
-      <button class="seg-btn" data-i="8" role="tab" aria-selected="false">Nastavení</button>
-      <button class="seg-btn" data-i="9" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
+      <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Kalendář</button>
+      <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kolo</button>
+      <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Můj profil<span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
+      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
     </div>
   </div>
 
@@ -733,11 +731,9 @@ button:focus-visible, input:focus-visible{
     <div class="panel" id="panel-1" role="tabpanel"></div>
     <div class="panel" id="panel-2" role="tabpanel"></div>
     <div class="panel" id="panel-3" role="tabpanel"></div>
-    <div class="panel" id="panel-4" role="tabpanel"></div>
     <div class="panel" id="panel-5" role="tabpanel"></div>
     <div class="panel" id="panel-6" role="tabpanel"></div>
     <div class="panel" id="panel-7" role="tabpanel"></div>
-    <div class="panel" id="panel-8" role="tabpanel"></div>
     <div class="panel" id="panel-9" role="tabpanel"></div>
   </div>
 
@@ -1026,7 +1022,7 @@ function maybeShowWelcome(){
       <div style="font-size:13px; line-height:1.7; color:var(--text-2); margin-bottom:18px;">
         <p style="margin-bottom:6px;">📊 <b style="color:var(--text);">Přehled</b> — vyber sport, uvidíš zápasy</p>
         <p style="margin-bottom:6px;">💰 <b style="color:var(--text);">Value</b> — jen skutečné příležitosti</p>
-        <p style="margin-bottom:6px;">💳 <b style="color:var(--text);">Moje sázky</b> — tvoje pokladna, s vestavěnou pojistkou</p>
+        <p style="margin-bottom:6px;">💳 <b style="color:var(--text);">Můj profil</b> — tvoje pokladna, s vestavěnou pojistkou</p>
         <p>Kdykoliv se ztratíš, klikni na <b style="color:var(--text);">„?"</b> v hlavičce.</p>
       </div>
       <button class="btn-primary" onclick="closeWelcome()">Jdeme na to</button>
@@ -1655,17 +1651,16 @@ function matchCardHtml(m){
   const c = COUNTRY[m.country];
   const tier = m._tier;
   const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
-  const bestOutcome = m._best.outcome;
-  let oddsHtml = '';
-  outcomes.forEach(o=>{
-    const best = bestBook(m,o);
-    const isBest = o===bestOutcome && tier!=='skip' && tier!=='research';
-    const lbl = o==='home' ? '1' : (o==='draw' ? 'X' : '2');
-    oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.odds.toFixed(2)}</span></div>`;
-  });
   const pickEntries = Object.entries(m.our_probabilities);
   const [pickOutcome, pickP] = pickEntries.reduce((a,b)=> b[1]>a[1] ? b : a);
   const pickLabel = pickOutcome==='home' ? m.home_team : pickOutcome==='draw' ? 'Remíza' : m.away_team;
+  let oddsHtml = '';
+  outcomes.forEach(o=>{
+    const best = bestBook(m,o);
+    const isBest = o===pickOutcome;
+    const lbl = o==='home' ? '1' : (o==='draw' ? 'X' : '2');
+    oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.odds.toFixed(2)}</span></div>`;
+  });
   const derby = isDerby(m.home_team, m.away_team);
   const freshness = m.updated_at ? formatAge(Math.floor((Date.now()-new Date(m.updated_at).getTime())/60000)) : null;
   return `
@@ -1681,7 +1676,7 @@ function matchCardHtml(m){
       <span class="tag ghost">conf ${m.confidence.score}</span>
     </div>
     <div class="odds-row">${oddsHtml}</div>
-    ${tier!=='skip' && tier!=='research' && bestOutcome!==pickOutcome ? `<div class="card-freshness" style="color:var(--gold);">💡 Zelený kurz = nejlepší matematická výhoda, ne nutně nejpravděpodobnější výsledek</div>` : ''}
+    <div class="card-freshness">🎯 Zelený kurz = na co bychom vsadili</div>
     ${freshness ? `<div class="card-freshness">🕐 data aktualizována: ${freshness}</div>` : ''}
   </div>`;
 }
@@ -1744,7 +1739,7 @@ function renderOverview(){
       <button class="kpi" onclick="setActiveTab(1)"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></button>
       <button class="kpi" onclick="${heroMatch ? `openModal('${heroMatch.id}')` : `setActiveTab(1)`}"><div class="val mono" style="color:var(--emerald)">${realValueOnes.length ? fmtPct(bestEv) : '—'}</div><div class="lbl">Nejlepší value</div></button>
       <button class="kpi" onclick="setActiveTab(1)"><div class="val mono" style="color:var(--gold)">${realValueOnes.length ? fmtPct(avgEv) : '—'}</div><div class="lbl">Průměrné EV</div></button>
-      <button class="kpi" onclick="setActiveTab(4)"><div class="val mono">${realValueOnes.length ? fmtCzk(recStake) : '—'}</div><div class="lbl">Doporučený vklad</div></button>
+      <button class="kpi" onclick="setActiveTab(6)"><div class="val mono">${realValueOnes.length ? fmtCzk(recStake) : '—'}</div><div class="lbl">Doporučený vklad</div></button>
     </div>
 
     ${heroMatch ? `
@@ -2046,7 +2041,7 @@ function onboardingChecklistHtml(){
 function onboardingChecklistHtmlInner(){
   try{ if(localStorage.getItem('precyz_onboarding_dismissed_v1')) return ''; }catch(e){}
   const items = [
-    { done: window.__precyzPushState === 'subscribed', label: '📲 Zapnout push oznámení', action: `setActiveTab(8); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: window.__precyzPushState === 'subscribed', label: '📲 Zapnout push oznámení', action: `setActiveTab(6); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
     { done: isStandalone(), label: '🏠 Nainstalovat appku na plochu', action: `showToast('Na iPhonu: Sdílet → Přidat na plochu. Na Androidu appka nabídku ukáže sama.')` },
     { done: (()=>{ try{ return !!localStorage.getItem('precyz_kelly_mode_v1'); }catch(e){ return false; } })(), label: '🎯 Zvolit styl sázení', action: `document.querySelector('.group-toggle')?.scrollIntoView({behavior:'smooth', block:'center'})` },
     { done: (()=>{ try{ return !!localStorage.getItem('precyz_viewed_help_v1'); }catch(e){ return false; } })(), label: '📖 Přečíst si, jak appka funguje', action: `showHelpModal()` },
@@ -2141,7 +2136,12 @@ function renderProfile(){
       <div class="kpi"><div class="val mono" style="color:${totalPnl()>=0?'var(--emerald)':'var(--red)'}">${fmtCzk(totalPnl())}</div><div class="lbl">Celkový P/L</div></div>
       <div class="kpi"><div class="val mono">${bets.length}</div><div class="lbl">Sázek celkem</div></div>
     </div>
+    <div id="myBetsSection"></div>
+    <div class="section-lbl" style="margin-top:28px;">⚙️ Nastavení</div>
+    <div id="mySettingsSection"></div>
   `;
+  renderMyBets();
+  renderSettings();
 }
 window.updateDisplayName = async function(name){
   name = name.trim().slice(0,40) || currentProfile.email.split('@')[0];
@@ -2180,15 +2180,13 @@ window.handleAvatarUpload = function(event){
 };
 
 function renderSettings(){
-  const el = document.getElementById('panel-8');
+  const el = document.getElementById('mySettingsSection');
   if(!el) return;
   const kellyMode = getKellyMode();
   const walletLog = loadWalletLog();
   const pushState = window.__precyzPushState || 'unknown'; // 'unsupported' | 'denied' | 'subscribed' | 'off'
 
   el.innerHTML = `
-    <h1 class="title">⚙️ Nastavení</h1>
-
     ${onboardingChecklistHtml()}
 
     <div class="section-lbl">🎯 Styl sázení</div>
@@ -2196,7 +2194,7 @@ function renderSettings(){
       <div class="group-toggle" style="margin-bottom:8px;">
         ${Object.entries(KELLY_MODES).map(([key,m])=>`<button class="${kellyMode===key?'active':''}" onclick="setKellyMode('${key}')">${KELLY_MODE_EMOJI[key]||''} ${m.label}</button>`).join('')}
       </div>
-      <p class="subtle" style="margin:8px 0 0;">Ovlivňuje, jak agresivně appka počítá doporučený vklad (frakční Kelly) na kartách zápasů i v Moje sázky.</p>
+      <p class="subtle" style="margin:8px 0 0;">Ovlivňuje, jak agresivně appka počítá doporučený vklad (frakční Kelly) na kartách zápasů i v Můj profil.</p>
     </div>
 
     <div class="section-lbl">🔔 Oznámení</div>
@@ -2230,7 +2228,8 @@ function renderSettings(){
 }
 
 function renderMyBets(){
-  const el = document.getElementById('panel-4');
+  const el = document.getElementById('myBetsSection');
+  if(!el) return;
   const total = totalBankroll();
   const pnl = totalPnl();
   const settled = bets.filter(b=>b.status!=='open');
@@ -2241,27 +2240,8 @@ function renderMyBets(){
   const kellyMode = getKellyMode();
   const kellyInfo = KELLY_MODES[kellyMode];
 
-  const accountHtml = (currentProfile && !currentProfile.isRootAdmin) ? `
-    <div class="section-lbl">Tvůj účet</div>
-    <div class="analysis-card" style="margin-bottom:20px;">
-      <div style="font-size:13px; color:var(--text-2); margin-bottom:4px;">${currentProfile.email}</div>
-      ${myAccountRow ? `
-        <div style="display:flex; gap:16px; flex-wrap:wrap;">
-          ${myAccountRow.price_czk ? `<div><div class="mono" style="font-weight:700; font-size:15px;">${fmtCzk(myAccountRow.price_czk)}</div><div style="font-size:11px; color:var(--text-2);">Předplatné</div></div>` : ''}
-          <div>
-            <div class="mono" style="font-weight:700; font-size:15px; color:${myAccountRow.expires_at && myAccountRow.expires_at < localDateStr(new Date()) ? 'var(--red)' : 'var(--text)'};">
-              ${myAccountRow.expires_at ? new Date(myAccountRow.expires_at).toLocaleDateString('cs-CZ') : 'Bez expirace'}
-            </div>
-            <div style="font-size:11px; color:var(--text-2);">Platnost do</div>
-          </div>
-        </div>
-      ` : `<p class="subtle" style="margin:0;">Bez omezení předplatného.</p>`}
-    </div>
-  ` : '';
-
   el.innerHTML = `
-    <h1 class="title">Pokladna</h1>
-    ${accountHtml}
+    <div class="section-lbl">💰 Pokladna a sázky</div>
     <div class="total-bankroll">
       <div><div class="lbl" style="color:var(--text-2); font-size:12px;">Celková pokladna</div><div class="v mono">${fmtCzk(total)}</div></div>
       <div style="text-align:right;"><div class="lbl" style="color:var(--text-2); font-size:12px;">Celkový P/L</div><div class="v mono" style="color:${pnl>=0?'var(--emerald)':'var(--red)'}; font-size:20px;">${pnl>=0?'+':''}${fmtCzk(pnl)}</div></div>
@@ -2274,7 +2254,7 @@ function renderMyBets(){
 
     <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Styl sázení</span>
-      <button class="pill" onclick="setActiveTab(8)" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
+      <button class="pill" onclick="document.getElementById('mySettingsSection')?.scrollIntoView({behavior:'smooth', block:'start'})" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
     </div>
     <div class="safety-note">🛡️ Aktuálně: <b>${kellyInfo.label}</b> — max. ${fmtCzk(total*kellyInfo.cap)} na jednu sázku (${Math.round(kellyInfo.cap*100)} % pokladny, frakční Kelly ${kellyInfo.frac}×).</div>
 
@@ -2462,7 +2442,7 @@ function renderRound(){
             <span class="round-card-time">${fmtTime(m.start_time)}</span>
           </div>
           <div class="round-card-teams">${derby?'🔥 ':''}${m.home_team} <span class="vs">–</span> ${m.away_team}</div>
-          <div class="round-card-pick">👉 <b>${topLabel}</b> <span class="mono" style="color:var(--text-3);">(${(topP*100).toFixed(0)} %)</span>${m._tier && m._tier!=='skip' && m._tier!=='research' ? ` · <span style="color:var(--emerald);">${fmtPct(m._best.ev)} EV</span>` : ''}</div>
+          <div class="round-card-pick">👉 <b style="color:var(--emerald);">${topLabel}</b> <span class="mono" style="color:var(--text-3);">(${(topP*100).toFixed(0)} %)</span>${m._tier && m._tier!=='skip' && m._tier!=='research' ? ` · <span style="color:var(--text-3);">${fmtPct(m._best.ev)} EV</span>` : ''}</div>
           ${m.top_pick ? `<div class="round-card-star">⭐ ${m.top_pick.label}</div>` : ''}
           ${m.research_key_point ? `<div class="round-card-note">${m.research_key_point}</div>` : ''}
         </div>
@@ -2859,7 +2839,6 @@ function openModalInner(id){
       <div class="note-box" style="margin-bottom:16px; border-color:rgba(99,214,160,.35);">
         <b style="color:var(--emerald);">👉 Doporučení appky: ${topLabel}</b>
         <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}${m._tier==='research' ? 'Appka na tenhle zápas nemá reálný kurz od kurzové kanceláře, takže "value" (EV) tu nejde poctivě spočítat — je to jen výzkumný odhad.' : ''}</p>
-        ${m._tier!=='skip' && m._tier!=='research' && topOutcome!==m._best.outcome ? `<p style="margin:8px 0 0; font-size:12px; line-height:1.5; color:var(--gold);">💡 Pozor, tohle je jiný výsledek než zelený kurz v tabulce výš — appka tam zvýrazňuje nejlepší <b>matematickou výhodu (EV)</b>, tady doporučuje <b>nejpravděpodobnější výsledek</b>. Obojí je platný signál, jen odpovídá na jinou otázku.</p>` : ''}
       </div>
       <div class="stat-grid">
         <div class="stat-box"><div class="v" style="color:${m._tier!=='skip' && m._tier!=='research' ?'var(--emerald)':'var(--text-2)'}">${m._tier==='research' ? '—' : fmtPct(m._best.ev)}</div><div class="l">${m._tier==='research' ? 'EV (bez reálného kurzu)' : `EV (${bookmakerLabel(m._best.book)})`}</div></div>
@@ -2934,9 +2913,9 @@ window.showHelpModal = function(){
       <p style="margin-bottom:10px;"><b style="color:var(--text);">💰 Value</b> — jen zápasy se skutečnou výhodou (EV ≥ 5 %).</p>
       <p style="margin-bottom:10px;"><b style="color:var(--text);">📈 Analýza</b> — Monte-Carlo simulace, faktory odhadu, pohyb kurzu v čase.</p>
       <p style="margin-bottom:10px;"><b style="color:var(--text);">📡 Radar</b> — arbitráž, value proti ostré knize, experimentální model signál.</p>
-      <p style="margin-bottom:10px;"><b style="color:var(--text);">💳 Moje sázky</b> — tvoje pokladna (3 peněženky), historie, graf zisku. Max vklad je 5 % pokladny (Kelly pojistka). Sázku jde vyhodnotit až po pravděpodobném konci zápasu.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">💳 Můj profil</b> — pokladna (3 peněženky), historie, graf zisku. Max vklad je 5 % pokladny (Kelly pojistka). Sázku jde vyhodnotit až po pravděpodobném konci zápasu.</p>
       <p style="margin-bottom:10px;"><b style="color:var(--text);">📅 Kalendář</b> — přehled dnů s value/výhrami/prohrami.</p>
-      <p style="margin-bottom:10px;"><b style="color:var(--text);">⚙️ Nastavení</b> — styl sázení, push oznámení, historie peněženky.</p>
+      <p style="margin-bottom:10px;"><b style="color:var(--text);">⚙️ Nastavení</b> — najdeš v Můj profil: styl sázení, push oznámení, historie peněženky.</p>
       <p style="margin-bottom:16px;"><b style="color:var(--text);">⚙️ Admin</b> — jen pro administrátora appky, správa přístupu.</p>
 
       <h3 style="color:var(--text); font-size:14px; margin-bottom:8px;">Pojmy</h3>
@@ -3451,7 +3430,7 @@ setInterval(tickAge, 15000); tickAge();
 
 /* ============================= INIT ============================= */
 function renderAll(){
-  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderMyBets, renderCalendar, renderRound, renderProfile, renderSettings, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
+  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderCalendar, renderRound, renderProfile, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
   for(const step of steps){
     try{ step(); }
     catch(e){ console.debug('[Precyz] render step failed, continuing with the rest:', step.name, e && e.message); }
