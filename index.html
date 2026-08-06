@@ -3188,6 +3188,12 @@ function positionThumb(i){
   thumbEl.style.width = btn.offsetWidth+'px';
   thumbEl.style.transform = `translateX(${btn.offsetLeft-4}px)`;
 }
+function panelTarget(i){
+  // skutečná pozice panelu v layoutu — spolehlivější než i*clientWidth,
+  // který se rozjede při jakékoliv nepřesnosti šířky (scrollbar, zaokrouhlení, fullscreen přechod)
+  const p = panelEls[i];
+  return p ? p.offsetLeft : i*pagerEl.clientWidth;
+}
 function setActiveTab(i, scroll=true){
   state.tab = i;
   segBtns.forEach((b,idx)=>{
@@ -3197,7 +3203,7 @@ function setActiveTab(i, scroll=true){
   positionThumb(i);
   if(i===1) markValueSeen();
   if(scroll){
-    pagerEl.scrollTo({left: i*pagerEl.clientWidth, behavior:'smooth'});
+    pagerEl.scrollTo({left: panelTarget(i), behavior:'smooth'});
     const targetPanel = document.querySelectorAll('.panel')[i];
     if(targetPanel){
       targetPanel.classList.remove('panel-enter');
@@ -3216,8 +3222,13 @@ pagerEl.addEventListener('scroll', ()=>{
   clearTimeout(scrollTimeout);
   scrollTimeout = setTimeout(()=>{
     if(suppressScrollDetect) return;
-    const i = Math.round(pagerEl.scrollLeft/pagerEl.clientWidth);
-    if(i!==state.tab) setActiveTab(i, false);
+    // nejbližší panel podle skutečné pozice, ne dělením clientWidth
+    let closest = 0, closestDist = Infinity;
+    panelEls.forEach((p,idx)=>{
+      const dist = Math.abs(p.offsetLeft - pagerEl.scrollLeft);
+      if(dist < closestDist){ closestDist = dist; closest = idx; }
+    });
+    if(closest!==state.tab) setActiveTab(closest, false);
   }, 80);
 });
 
@@ -3264,25 +3275,38 @@ document.addEventListener('keydown', e=>{
   if(e.key==='ArrowRight' && state.tab<last) setActiveTab(state.tab+1);
   if(e.key==='ArrowLeft' && state.tab>0) setActiveTab(state.tab-1);
 });
-let resizeSettleTimer;
-function repositionPager(){
+
+/* Fullscreen/resize handling — přechod do/z fullscreenu (nebo jakákoliv jiná změna rozměrů)
+   často trvá víc snímků (scrollbar mizí/objevuje se, viewport se mění postupně), takže jedno
+   pevné zpoždění nestačí. ResizeObserver na pageru se spustí při KAŽDÉ změně jeho rozměrů,
+   po celou dobu přechodu, a pokaždé přesně dorovná scroll na skutečnou pozici panelu. */
+let repositionRaf = null;
+function repositionPagerNow(){
   suppressScrollDetect = true;
-  positionThumb(state.tab);
-  // dočasně vypnout smooth scroll, jinak se pager během fullscreen přechodu rozjede a špatně zasnapuje
   pagerEl.style.scrollBehavior = 'auto';
-  pagerEl.scrollLeft = state.tab * pagerEl.clientWidth;
-  clearTimeout(resizeSettleTimer);
-  resizeSettleTimer = setTimeout(()=>{
-    pagerEl.scrollLeft = state.tab * pagerEl.clientWidth; // dorovnání po dokončení resize animace prohlížeče
-    pagerEl.style.scrollBehavior = '';
-    applyParallax();
-    suppressScrollDetect = false;
-  }, 250);
+  pagerEl.scrollLeft = panelTarget(state.tab);
+  positionThumb(state.tab);
+  applyParallax();
 }
-window.addEventListener('resize', repositionPager);
-window.addEventListener('orientationchange', repositionPager);
-document.addEventListener('fullscreenchange', repositionPager);
-document.addEventListener('webkitfullscreenchange', repositionPager);
+const pagerResizeObserver = new ResizeObserver(()=>{
+  repositionPagerNow();
+  if(repositionRaf) cancelAnimationFrame(repositionRaf);
+  // ještě jednou po vykreslení, ať chytíme i poslední doladění layoutu prohlížečem
+  repositionRaf = requestAnimationFrame(()=>{
+    repositionPagerNow();
+    clearTimeout(pagerSettleTimer);
+    pagerSettleTimer = setTimeout(()=>{
+      repositionPagerNow();
+      pagerEl.style.scrollBehavior = '';
+      suppressScrollDetect = false;
+    }, 200);
+  });
+});
+let pagerSettleTimer;
+pagerResizeObserver.observe(pagerEl);
+window.addEventListener('orientationchange', repositionPagerNow);
+document.addEventListener('fullscreenchange', repositionPagerNow);
+document.addEventListener('webkitfullscreenchange', repositionPagerNow);
 
 /* expose functions used inline */
 window.selectCategory = selectCategory;
