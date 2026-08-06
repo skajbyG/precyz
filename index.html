@@ -29,6 +29,30 @@
   --radius:20px;
   --ease:cubic-bezier(.22,.61,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
 }
+/* --- Vzhled: alternativní témata (výchozí = Ember, beze změny) --- */
+html[data-theme="classic"]{
+  --bg:#0e1116; --bg-elev:#171b22;
+  --surface:rgba(230,237,243,.042); --surface-2:rgba(230,237,243,.07); --surface-hi:rgba(230,237,243,.11);
+  --stroke:rgba(210,220,230,.09); --stroke-2:rgba(210,220,230,.18);
+  --text:#e6edf3; --text-2:#8b96a3; --text-3:#57616c;
+  --emerald:#3fb950; --gold:#58a6ff; --teal:#79c0ff; --red:#f85149;
+}
+html[data-theme="contrast"]{
+  --bg:#000000; --bg-elev:#0a0a0a;
+  --surface:rgba(255,255,255,.08); --surface-2:rgba(255,255,255,.14); --surface-hi:rgba(255,255,255,.22);
+  --stroke:rgba(255,255,255,.35); --stroke-2:rgba(255,255,255,.55);
+  --text:#ffffff; --text-2:#d8d8d8; --text-3:#a8a8a8;
+  --emerald:#00e676; --gold:#ffd600; --teal:#00e5ff; --red:#ff1744;
+}
+/* --- Vzhled: kompaktní hustota (méně odsazení, menší písmo) --- */
+html[data-density="compact"] .panel{padding:14px 12px 60px;}
+html[data-density="compact"] .card{padding:12px 14px;}
+html[data-density="compact"] .kpi{padding:11px;}
+html[data-density="compact"] .analysis-card{padding:12px;}
+html[data-density="compact"] .note-box{padding:9px 11px;}
+html[data-density="compact"] .card-teams{font-size:14px; margin-bottom:7px;}
+html[data-density="compact"] .kpi .val{font-size:19px;}
+html[data-density="compact"] .section-lbl{margin-top:16px;}
 *{box-sizing:border-box; margin:0; padding:0;}
 html,body{height:100%;}
 body{
@@ -1537,6 +1561,62 @@ function setKellyMode(mode){
   renderSettings();
 }
 window.setKellyMode = setKellyMode;
+
+/* ---- Vzhled appky ---- */
+const THEME_META = { ember: '🔥 Ember', classic: '🌙 Klasická tmavá', contrast: '⚫ Vysoký kontrast' };
+const DENSITY_META = { comfortable: 'Komfortní', compact: 'Kompaktní' };
+function getTheme(){ try{ return localStorage.getItem('precyz_theme_v1') || 'ember'; }catch(e){ return 'ember'; } }
+function getDensity(){ try{ return localStorage.getItem('precyz_density_v1') || 'comfortable'; }catch(e){ return 'comfortable'; } }
+function applyAppearance(){
+  const theme = getTheme(), density = getDensity();
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.density = density;
+}
+function setTheme(theme){
+  if(!THEME_META[theme]) return;
+  try{ localStorage.setItem('precyz_theme_v1', theme); }catch(e){}
+  applyAppearance();
+  renderSettings();
+}
+function setDensity(density){
+  if(!DENSITY_META[density]) return;
+  try{ localStorage.setItem('precyz_density_v1', density); }catch(e){}
+  applyAppearance();
+  renderSettings();
+}
+window.setTheme = setTheme;
+window.setDensity = setDensity;
+applyAppearance(); // aplikovat hned při načtení appky, ne až při otevření Nastavení
+
+/* ---- Sázkové preference ---- */
+function getDefaultBook(){ try{ return localStorage.getItem('precyz_default_book_v1') || 'tipsport'; }catch(e){ return 'tipsport'; } }
+function setDefaultBook(book){
+  try{ localStorage.setItem('precyz_default_book_v1', book); }catch(e){}
+  renderSettings();
+}
+function getStakeLimit(){ try{ return Number(localStorage.getItem('precyz_stake_limit_v1')) || 0; }catch(e){ return 0; } } // 0 = bez vlastního limitu
+function setStakeLimit(val){
+  const n = Math.max(0, Math.round(Number(val)||0));
+  try{ localStorage.setItem('precyz_stake_limit_v1', String(n)); }catch(e){}
+  renderSettings();
+}
+window.setDefaultBook = setDefaultBook;
+window.setStakeLimit = setStakeLimit;
+
+/* ---- Notifikace: co appka zvýrazňuje / posílá push na ---- */
+function getNotifPrefs(){
+  try{ return JSON.parse(localStorage.getItem('precyz_notif_prefs_v1')||'{}'); }catch(e){ return {}; }
+}
+function notifEnabled(key){ const p = getNotifPrefs(); return p[key] !== false; } // výchozí = zapnuto
+function toggleNotifPref(key){
+  const p = getNotifPrefs();
+  p[key] = !notifEnabled(key);
+  try{ localStorage.setItem('precyz_notif_prefs_v1', JSON.stringify(p)); }catch(e){}
+  renderSettings();
+  updateValueBadge();
+  updateSettleBadge();
+}
+window.toggleNotifPref = toggleNotifPref;
 function kellyStakeCzk(bankroll, p, odds){
   const mode = KELLY_MODES[getKellyMode()] || KELLY_MODES.standard;
   const b = odds-1;
@@ -2185,6 +2265,10 @@ function renderSettings(){
   const kellyMode = getKellyMode();
   const walletLog = loadWalletLog();
   const pushState = window.__precyzPushState || 'unknown'; // 'unsupported' | 'denied' | 'subscribed' | 'off'
+  const theme = getTheme();
+  const density = getDensity();
+  const defaultBook = getDefaultBook();
+  const stakeLimit = getStakeLimit();
 
   el.innerHTML = `
     ${onboardingChecklistHtml()}
@@ -2197,6 +2281,43 @@ function renderSettings(){
       <p class="subtle" style="margin:8px 0 0;">Ovlivňuje, jak agresivně appka počítá doporučený vklad (frakční Kelly) na kartách zápasů i v Můj profil.</p>
     </div>
 
+    <div class="section-lbl">💶 Sázkové preference</div>
+    <div class="note-box" style="margin-bottom:20px;">
+      <div style="margin-bottom:14px;">
+        <b style="color:var(--text); font-size:12.5px;">Výchozí sázkovka</b>
+        <p class="subtle" style="margin:2px 0 8px;">Předvyplní se v kartě „Vsadit tip" — pořád jde ručně přepnout.</p>
+        <div class="group-toggle" style="margin-bottom:0;">
+          <button class="${defaultBook==='tipsport'?'active':''}" onclick="setDefaultBook('tipsport')">🔵 Tipsport</button>
+          <button class="${defaultBook==='fortuna'?'active':''}" onclick="setDefaultBook('fortuna')">🟡 Fortuna</button>
+          <button class="${defaultBook==='betano'?'active':''}" onclick="setDefaultBook('betano')">🔴 Betano</button>
+        </div>
+      </div>
+      <div>
+        <b style="color:var(--text); font-size:12.5px;">Vlastní limit na sázku</b>
+        <p class="subtle" style="margin:2px 0 8px;">Appka odmítne sázku nad tuhle částku, i kdyby ji Kelly doporučil vyšší. Nech prázdné/0 pro žádný vlastní limit.</p>
+        <div class="stake-input-wrap" style="max-width:160px;">
+          <input type="number" min="0" step="50" value="${stakeLimit||''}" placeholder="bez limitu" onchange="setStakeLimit(this.value)">
+          <span class="suffix">Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-lbl">🎨 Vzhled</div>
+    <div class="note-box" style="margin-bottom:20px;">
+      <div style="margin-bottom:14px;">
+        <b style="color:var(--text); font-size:12.5px;">Motiv</b>
+        <div class="group-toggle" style="margin:8px 0 0;">
+          ${Object.entries(THEME_META).map(([key,label])=>`<button class="${theme===key?'active':''}" onclick="setTheme('${key}')">${label}</button>`).join('')}
+        </div>
+      </div>
+      <div>
+        <b style="color:var(--text); font-size:12.5px;">Hustota rozhraní</b>
+        <div class="group-toggle" style="margin:8px 0 0;">
+          ${Object.entries(DENSITY_META).map(([key,label])=>`<button class="${density===key?'active':''}" onclick="setDensity('${key}')">${label}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+
     <div class="section-lbl">🔔 Oznámení</div>
     <div class="note-box" style="margin-bottom:20px;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
@@ -2207,6 +2328,21 @@ function renderSettings(){
         <button class="btn-primary" style="width:auto; padding:9px 16px; font-size:12.5px; flex-shrink:0;" onclick="togglePushNotifications()" id="pushToggleBtn">${pushState==='subscribed' ? '✅ Zapnuto' : 'Zapnout'}</button>
       </div>
       <div id="pushStatusNote" style="font-size:11.5px; color:var(--text-3); margin-top:8px;"></div>
+      <div style="height:1px; background:var(--stroke); margin:14px 0;"></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+        <div>
+          <b style="color:var(--text); font-size:12.5px;">🟢 Nové value příležitosti</b>
+          <p style="margin:2px 0 0; font-size:11.5px; color:var(--text-2);">Číslo u tabu Value, když appka najde novou reálnou EV příležitost.</p>
+        </div>
+        <button class="pill" style="flex-shrink:0;" onclick="toggleNotifPref('value')">${notifEnabled('value') ? '✅ Zapnuto' : 'Vypnuto'}</button>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <b style="color:var(--text); font-size:12.5px;">🧾 Nevyhodnocené sázky</b>
+          <p style="margin:2px 0 0; font-size:11.5px; color:var(--text-2);">Číslo u tabu Můj profil, když má appka sázku čekající na vyhodnocení.</p>
+        </div>
+        <button class="pill" style="flex-shrink:0;" onclick="toggleNotifPref('settle')">${notifEnabled('settle') ? '✅ Zapnuto' : 'Vypnuto'}</button>
+      </div>
     </div>
 
     <div class="section-lbl">💰 Historie peněženky</div>
@@ -2876,9 +3012,9 @@ function openModalInner(id){
         <div class="bet-field">
           <label for="betBook">Peněženka</label>
           <select id="betBook">
-            <option value="tipsport">🔵 Tipsport</option>
-            <option value="fortuna">🟡 Fortuna</option>
-            <option value="betano">🔴 Betano</option>
+            <option value="tipsport" ${getDefaultBook()==='tipsport'?'selected':''}>🔵 Tipsport</option>
+            <option value="fortuna" ${getDefaultBook()==='fortuna'?'selected':''}>🟡 Fortuna</option>
+            <option value="betano" ${getDefaultBook()==='betano'?'selected':''}>🔴 Betano</option>
           </select>
         </div>
         <div class="bet-field">
@@ -3006,6 +3142,11 @@ async function placeBet(matchId){
   const outcome = document.getElementById('betOutcome').value;
   const book = document.getElementById('betBook').value;
   const stake = Math.max(10, Math.round(Number(document.getElementById('betStake').value)||0));
+  const stakeLimit = getStakeLimit();
+  if(stakeLimit > 0 && stake > stakeLimit){
+    showToast(`Nad tvůj vlastní limit ${fmtCzk(stakeLimit)} na sázku (nastavíš v Můj profil → Nastavení).`, 'error');
+    return;
+  }
   if(bankroll[book] < stake){ showToast('Nedostatek prostředků v peněžence '+book+'.', 'error'); return; }
   const odds = bestBook(m, outcome).odds; // nejlepší dostupný kurz — appka nepředstírá, že zná přesný kurz konkrétní tvé kanceláře
   bankroll[book] -= stake;
@@ -3467,6 +3608,7 @@ function renderAll(){
 function updateSettleBadge(){
   const badge = document.getElementById('settleBadge');
   if(!badge) return;
+  if(!notifEnabled('settle')){ badge.style.display = 'none'; return; }
   const readyToSettle = bets.filter(b=>{
     if(b.status!=='open') return false;
     const match = MATCHES.find(m=>m.id===b.matchId);
@@ -3482,6 +3624,7 @@ function updateSettleBadge(){
 function updateValueBadge(){
   const badge = document.getElementById('valueBadge');
   if(!badge) return;
+  if(!notifEnabled('value')){ badge.style.display = 'none'; return; }
   let lastSeen = 0;
   try{ lastSeen = Number(localStorage.getItem('precyz_value_lastseen_v1') || 0); }catch(e){}
   const newCount = MATCHES.filter(m => m._tier!=='skip' && m._tier!=='research' && m.updated_at && new Date(m.updated_at).getTime() > lastSeen).length;
