@@ -1791,7 +1791,7 @@ function matchCardHtml(m){
     const best = bestBook(m,o);
     const isBest = o===pickOutcome;
     const lbl = o==='home' ? '1' : (o==='draw' ? 'X' : '2');
-    oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.odds.toFixed(2)}</span></div>`;
+    oddsHtml += `<div class="odds-cell ${isBest?'best':''}"><span class="k">${lbl}</span><span class="v">${best.book ? best.odds.toFixed(2) : '—'}</span></div>`;
   });
   const derby = isDerby(m.home_team, m.away_team);
   const freshness = m.updated_at ? formatAge(Math.floor((Date.now()-new Date(m.updated_at).getTime())/60000)) : null;
@@ -2925,7 +2925,7 @@ function openModalInner(id){
   const kelly = kellyStakeCzk(totalBankroll(), m._best.p, m._best.odds);
   const betOptions = outcomes.map(o=>{
     const best = bestBook(m,o);
-    return `<option value="${o}">${o==='home'?'1 · '+m.home_team : o==='draw' ? 'X · Remíza' : '2 · '+m.away_team} @ ${best.odds.toFixed(2)}</option>`;
+    return `<option value="${o}">${o==='home'?'1 · '+m.home_team : o==='draw' ? 'X · Remíza' : '2 · '+m.away_team} @ ${best.book ? best.odds.toFixed(2) : '—'}</option>`;
   }).join('');
 
   const entries = Object.entries(m.our_probabilities);
