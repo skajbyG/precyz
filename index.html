@@ -46,6 +46,9 @@ html[data-theme="contrast"]{
 }
 /* --- Vzhled: kompaktní hustota (méně odsazení, menší písmo) --- */
 html[data-density="compact"] .panel{padding:14px 12px 60px;}
+@media(max-width:600px){
+  html[data-density="compact"] .panel{padding:12px 10px calc(80px + env(safe-area-inset-bottom));}
+}
 html[data-density="compact"] .card{padding:12px 14px;}
 html[data-density="compact"] .kpi{padding:11px;}
 html[data-density="compact"] .analysis-card{padding:12px;}
@@ -147,7 +150,7 @@ header{
 .chat-foot input{flex:1; min-width:0; background:var(--surface); border:1px solid var(--stroke); border-radius:10px; padding:9px 12px; color:var(--text); font-size:13.5px;}
 .chat-foot input:focus{outline:none; border-color:var(--gold);}
 @media(max-width:600px){
-  .chat-panel{right:8px; left:8px; width:auto; max-width:none;}
+  .chat-panel{right:8px; left:8px; width:auto; max-width:none; height:min(60vh, calc(100vh - 200px));}
 }
 
 /* segmented nav */
@@ -689,18 +692,42 @@ button:focus-visible, input:focus-visible{
 @keyframes authIn{ from{opacity:0; transform:translateY(16px) scale(.97);} to{opacity:1; transform:translateY(0) scale(1);} }
 
 @media(max-width:600px){
-  .navwrap{top:calc(60px + env(safe-area-inset-top));}
-  header{padding:12px 14px;}
-  .panel{padding:16px 14px 70px;}
+  header{padding:10px 14px;}
+  .brand{gap:7px;}
+  .header-right{gap:6px;}
+  .panel{padding:14px 12px calc(88px + env(safe-area-inset-bottom));}
   .clock{display:none;}
-  .age-chip{padding:5px 9px; font-size:10.5px; gap:5px;}
-  #logoutBtn{padding:6px 11px; font-size:11px;}
+  .age-chip{padding:5px 8px; font-size:10px; gap:4px;}
+  .age-chip span:last-child{max-width:74px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #logoutBtn{padding:6px 10px; font-size:10.5px;}
   .wordmark{font-size:15px;}
   .logo{width:30px; height:30px;}
+  #chatBtn, [onclick="showHelpModal()"]{padding:6px 9px; font-size:13px;}
+
+  /* --- Dock: navigace dolů, jako pořádná mobilní appka, ne natlačená lišta nahoře --- */
+  .navwrap{
+    position:fixed; top:auto; bottom:0; left:0; right:0; z-index:60;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+    background:rgba(16,11,7,.92); backdrop-filter:blur(20px) saturate(140%);
+    border-bottom:none; border-top:1px solid var(--stroke);
+    box-shadow:0 -8px 24px rgba(0,0,0,.35);
+  }
+  .segmented{max-width:none; border-radius:16px; padding:3px; gap:1px;}
+  .seg-thumb{border-radius:13px;}
+  .seg-btn{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:2px; flex:0 0 auto; min-width:60px; padding:7px 5px 6px;
+  }
+  .seg-icon{display:block; font-size:18px; line-height:1;}
+  .seg-label{display:block; font-size:9px; font-weight:700; white-space:nowrap; letter-spacing:0;}
+  .seg-label-full{display:none;}
+  .seg-label-short{display:block;}
+  .tab-badge{position:absolute; top:1px; right:6px; margin-left:0;}
 }
 @media(max-width:360px){
-  .header-right{gap:8px;}
-  .age-chip span:last-child{ max-width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .seg-btn{min-width:52px; padding:6px 3px 5px;}
+  .seg-icon{font-size:16px;}
+  .seg-label{font-size:8.5px;}
 }
 </style>
 </head>
@@ -739,14 +766,14 @@ button:focus-visible, input:focus-visible{
   <div class="navwrap">
     <div class="segmented" id="segmented" role="tablist" aria-label="Hlavní navigace">
       <div class="seg-thumb" id="segThumb"></div>
-      <button class="seg-btn active" data-i="0" role="tab" aria-selected="true">Přehled</button>
-      <button class="seg-btn" data-i="1" role="tab" aria-selected="false">Value<span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
-      <button class="seg-btn" data-i="2" role="tab" aria-selected="false">Analýza</button>
-      <button class="seg-btn" data-i="3" role="tab" aria-selected="false">Radar</button>
-      <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Kalendář</button>
-      <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kolo</button>
-      <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Můj profil<span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
-      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
+      <button class="seg-btn active" data-i="0" role="tab" aria-selected="true"><span class="seg-icon">📊</span><span class="seg-label">Přehled</span></button>
+      <button class="seg-btn" data-i="1" role="tab" aria-selected="false"><span class="seg-icon">💰</span><span class="seg-label">Value</span><span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
+      <button class="seg-btn" data-i="2" role="tab" aria-selected="false"><span class="seg-icon">📈</span><span class="seg-label">Analýza</span></button>
+      <button class="seg-btn" data-i="3" role="tab" aria-selected="false"><span class="seg-icon">📡</span><span class="seg-label">Radar</span></button>
+      <button class="seg-btn" data-i="4" role="tab" aria-selected="false"><span class="seg-icon">📅</span><span class="seg-label">Kalendář</span></button>
+      <button class="seg-btn" data-i="5" role="tab" aria-selected="false"><span class="seg-icon">🎲</span><span class="seg-label">Kolo</span></button>
+      <button class="seg-btn" data-i="6" role="tab" aria-selected="false"><span class="seg-icon">👤</span><span class="seg-label seg-label-full">Můj profil</span><span class="seg-label seg-label-short">Profil</span><span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
+      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;"><span class="seg-icon">🛠️</span><span class="seg-label">Admin</span></button>
     </div>
   </div>
 
