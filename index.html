@@ -694,8 +694,9 @@ button:focus-visible, input:focus-visible{
       <button class="seg-btn" data-i="4" role="tab" aria-selected="false">Moje sázky<span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="5" role="tab" aria-selected="false">Kalendář</button>
       <button class="seg-btn" data-i="6" role="tab" aria-selected="false">Kolo</button>
-      <button class="seg-btn" data-i="7" role="tab" aria-selected="false">Nastavení</button>
-      <button class="seg-btn" data-i="8" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
+      <button class="seg-btn" data-i="7" role="tab" aria-selected="false">Můj profil</button>
+      <button class="seg-btn" data-i="8" role="tab" aria-selected="false">Nastavení</button>
+      <button class="seg-btn" data-i="9" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;">Admin</button>
     </div>
   </div>
 
@@ -709,6 +710,7 @@ button:focus-visible, input:focus-visible{
     <div class="panel" id="panel-6" role="tabpanel"></div>
     <div class="panel" id="panel-7" role="tabpanel"></div>
     <div class="panel" id="panel-8" role="tabpanel"></div>
+    <div class="panel" id="panel-9" role="tabpanel"></div>
   </div>
 
   <footer>
@@ -979,6 +981,8 @@ async function handleAuthedUser(user){
   await loadMatchesFromDb();
   await loadLastSyncTime();
   await loadMyAccountInfo();
+  loadResultLog();
+  loadUserProfile();
   startLiveMatches();
   if(!isRootAdmin) watchOwnAccess(email); // the root admin's access is hardcoded, nothing to watch
   renderAll();
@@ -1171,7 +1175,7 @@ window.downloadBackup = async function(){
   }
 };
 async function renderAdminPanel(){
-  const el = document.getElementById('panel-8');
+  const el = document.getElementById('panel-9');
   if(!el) return;
   el.innerHTML = `<h1 class="title">Admin</h1><p class="subtle">Načítám…</p>`;
   try{
@@ -1395,6 +1399,16 @@ async function loadArchivedMatchesForCalendar(){
 }
 // Zapíše aktuální "tip appky" pro zápasy, co ještě nezačaly — jednou zapsáno se
 // nepřepisuje po výkopu, ať appka nemůže zpětně "opravit" tip po vidění výsledku.
+let RESULT_LOG = [];
+async function loadResultLog(){
+  if(!SUPABASE_CONFIGURED) return;
+  try{
+    const { data, error } = await supabase.from('recommendation_log').select('*').not('result','is',null);
+    if(error) throw error;
+    RESULT_LOG = data || [];
+    renderCalendar();
+  }catch(e){ console.debug('[Precyz] result log load failed:', e && e.message); }
+}
 async function logRecommendations(){
   if(!currentUser) return;
   const upcoming = MATCHES.filter(m => new Date(m.start_time).getTime() > Date.now());
@@ -1649,6 +1663,7 @@ function matchCardHtml(m){
       <span class="tag ghost">conf ${m.confidence.score}</span>
     </div>
     <div class="odds-row">${oddsHtml}</div>
+    ${tier!=='skip' && tier!=='research' && bestOutcome!==pickOutcome ? `<div class="card-freshness" style="color:var(--gold);">💡 Zelený kurz = nejlepší matematická výhoda, ne nutně nejpravděpodobnější výsledek</div>` : ''}
     ${freshness ? `<div class="card-freshness">🕐 data aktualizována: ${freshness}</div>` : ''}
   </div>`;
 }
@@ -2013,7 +2028,7 @@ function onboardingChecklistHtml(){
 function onboardingChecklistHtmlInner(){
   try{ if(localStorage.getItem('precyz_onboarding_dismissed_v1')) return ''; }catch(e){}
   const items = [
-    { done: window.__precyzPushState === 'subscribed', label: '📲 Zapnout push oznámení', action: `setActiveTab(7); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
+    { done: window.__precyzPushState === 'subscribed', label: '📲 Zapnout push oznámení', action: `setActiveTab(8); document.getElementById('pushToggleBtn')?.scrollIntoView({behavior:'smooth', block:'center'})` },
     { done: isStandalone(), label: '🏠 Nainstalovat appku na plochu', action: `showToast('Na iPhonu: Sdílet → Přidat na plochu. Na Androidu appka nabídku ukáže sama.')` },
     { done: (()=>{ try{ return !!localStorage.getItem('precyz_kelly_mode_v1'); }catch(e){ return false; } })(), label: '🎯 Zvolit styl sázení', action: `document.querySelector('.group-toggle')?.scrollIntoView({behavior:'smooth', block:'center'})` },
     { done: (()=>{ try{ return !!localStorage.getItem('precyz_viewed_help_v1'); }catch(e){ return false; } })(), label: '📖 Přečíst si, jak appka funguje', action: `showHelpModal()` },
@@ -2043,8 +2058,101 @@ window.dismissOnboarding = function(){
   renderSettings();
 };
 
-function renderSettings(){
+let USER_PROFILE = null;
+async function loadUserProfile(){
+  if(!SUPABASE_CONFIGURED || !currentUser) return;
+  try{
+    const { data, error } = await supabase.from('user_profiles').select('*').eq('uid', currentUser.id).single();
+    if(!error && data) USER_PROFILE = data;
+    renderProfile();
+  }catch(e){ /* žádný profil zatím = normální stav pro nové uživatele */ }
+}
+function renderProfile(){
   const el = document.getElementById('panel-7');
+  if(!el || !currentProfile) return;
+  const displayName = (USER_PROFILE && USER_PROFILE.display_name) || currentProfile.email.split('@')[0];
+  const avatar = USER_PROFILE && USER_PROFILE.avatar_base64;
+  const settledBets = bets.filter(b=>b.status!=='open');
+  const wins = settledBets.filter(b=>b.status==='win').length;
+  const hitRate = settledBets.length ? Math.round(wins/settledBets.length*100) : null;
+
+  el.innerHTML = `
+    <h1 class="title">👤 Můj profil</h1>
+    <div class="analysis-card" style="text-align:center; padding:28px 20px;">
+      <div style="position:relative; width:96px; height:96px; margin:0 auto 14px;">
+        <div id="avatarPreview" style="width:96px; height:96px; border-radius:50%; overflow:hidden; background:linear-gradient(135deg,var(--gold),var(--teal)); display:flex; align-items:center; justify-content:center; font-size:34px; font-weight:800; color:#1a1006; border:3px solid var(--stroke-2);">
+          ${avatar ? `<img src="${avatar}" style="width:100%; height:100%; object-fit:cover;">` : displayName.charAt(0).toUpperCase()}
+        </div>
+        <button onclick="document.getElementById('avatarInput').click()" style="position:absolute; bottom:0; right:0; width:30px; height:30px; border-radius:50%; background:var(--gold); color:#1a1006; font-size:14px; border:2px solid var(--bg-elev); display:flex; align-items:center; justify-content:center;" aria-label="Nahrát fotku">📷</button>
+        <input type="file" id="avatarInput" accept="image/*" style="display:none;" onchange="handleAvatarUpload(event)">
+      </div>
+      <input type="text" id="displayNameInput" value="${displayName}" onchange="updateDisplayName(this.value)" style="background:transparent; border:none; text-align:center; font-size:18px; font-weight:700; color:var(--text); width:100%; margin-bottom:4px;">
+      <p class="subtle" style="margin:0;">${currentProfile.email}</p>
+      ${currentProfile.isRootAdmin ? '<span class="tag high" style="margin-top:8px; display:inline-block;">👑 Administrátor</span>' : ''}
+    </div>
+
+    ${!currentProfile.isRootAdmin ? `
+    <div class="section-lbl">💳 Předplatné</div>
+    <div class="analysis-card" style="margin-bottom:20px;">
+      ${myAccountRow ? `
+        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+          ${myAccountRow.price_czk ? `<div><div class="mono" style="font-weight:700; font-size:15px;">${fmtCzk(myAccountRow.price_czk)}</div><div style="font-size:11px; color:var(--text-2);">Předplatné</div></div>` : ''}
+          <div>
+            <div class="mono" style="font-weight:700; font-size:15px; color:${myAccountRow.expires_at && myAccountRow.expires_at < localDateStr(new Date()) ? 'var(--red)' : 'var(--text)'};">
+              ${myAccountRow.expires_at ? new Date(myAccountRow.expires_at).toLocaleDateString('cs-CZ') : 'Bez expirace'}
+            </div>
+            <div style="font-size:11px; color:var(--text-2);">Platnost do</div>
+          </div>
+        </div>
+      ` : `<p class="subtle" style="margin:0;">Bez omezení předplatného.</p>`}
+    </div>` : ''}
+
+    <div class="section-lbl">📊 Moje čísla</div>
+    <div class="perf-grid">
+      <div class="kpi"><div class="val mono">${settledBets.length}</div><div class="lbl">Vyhodnocených sázek</div></div>
+      <div class="kpi"><div class="val mono">${hitRate===null?'—':hitRate+'%'}</div><div class="lbl">Moje přesnost</div></div>
+      <div class="kpi"><div class="val mono" style="color:${totalPnl()>=0?'var(--emerald)':'var(--red)'}">${fmtCzk(totalPnl())}</div><div class="lbl">Celkový P/L</div></div>
+      <div class="kpi"><div class="val mono">${bets.length}</div><div class="lbl">Sázek celkem</div></div>
+    </div>
+  `;
+}
+window.updateDisplayName = async function(name){
+  name = name.trim().slice(0,40) || currentProfile.email.split('@')[0];
+  USER_PROFILE = { ...(USER_PROFILE||{}), uid: currentUser.id, email: currentProfile.email, display_name: name };
+  try{
+    await supabase.from('user_profiles').upsert({ uid: currentUser.id, email: currentProfile.email, display_name: name, updated_at: new Date().toISOString() });
+    showToast('Jméno uloženo.');
+  }catch(e){ showToast('Nepodařilo se uložit jméno.', 'error'); }
+};
+window.handleAvatarUpload = function(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(file.size > 8*1024*1024){ showToast('Fotka je moc velká (max 8 MB).', 'error'); return; }
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = (e) => { img.src = e.target.result; };
+  img.onload = async () => {
+    // appka fotku zmenší na 256×256, ať appka neplní appku ani databázi zbytečně velkými soubory
+    const canvas = document.createElement('canvas');
+    const size = 256;
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const scale = Math.max(size/img.width, size/img.height);
+    const w = img.width*scale, h = img.height*scale;
+    ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+    const dataUri = canvas.toDataURL('image/jpeg', 0.85);
+    document.getElementById('avatarPreview').innerHTML = `<img src="${dataUri}" style="width:100%; height:100%; object-fit:cover;">`;
+    USER_PROFILE = { ...(USER_PROFILE||{}), uid: currentUser.id, email: currentProfile.email, avatar_base64: dataUri };
+    try{
+      await supabase.from('user_profiles').upsert({ uid: currentUser.id, email: currentProfile.email, avatar_base64: dataUri, updated_at: new Date().toISOString() });
+      showToast('Fotka uložena.');
+    }catch(e){ showToast('Nepodařilo se uložit fotku.', 'error'); }
+  };
+  reader.readAsDataURL(file);
+};
+
+function renderSettings(){
+  const el = document.getElementById('panel-8');
   if(!el) return;
   const kellyMode = getKellyMode();
   const walletLog = loadWalletLog();
@@ -2138,7 +2246,7 @@ function renderMyBets(){
 
     <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Styl sázení</span>
-      <button class="pill" onclick="setActiveTab(7)" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
+      <button class="pill" onclick="setActiveTab(8)" style="text-transform:none; letter-spacing:0;">⚙️ Změnit v Nastavení</button>
     </div>
     <div class="safety-note">🛡️ Aktuálně: <b>${kellyInfo.label}</b> — max. ${fmtCzk(total*kellyInfo.cap)} na jednu sázku (${Math.round(kellyInfo.cap*100)} % pokladny, frakční Kelly ${kellyInfo.frac}×).</div>
 
@@ -2291,6 +2399,7 @@ function dayHasDot(dateStr){
   if(dayMatches.some(m=>m._tier!=='skip' && m._tier!=='research')) dots.push('#0072B2'); // blue
   if(dayMatches.length) dots.push('#CC79A7'); // reddish purple
   if(eventsFor(dateStr).length) dots.push('#E69F00'); // orange
+  if(RESULT_LOG.some(r=>localDateStr(new Date(r.start_time))===dateStr)) dots.push('#56B4E9'); // sky blue — appka má zaznamenaný výsledek
   return dots;
 }
 
@@ -2429,6 +2538,7 @@ function renderCalendar(){
       <div class="li"><span class="sw" style="background:#F0E442"></span>Otevřená sázka</div>
       <div class="li"><span class="sw" style="background:#CC79A7"></span>Ve skenu</div>
       <div class="li"><span class="sw" style="background:#E69F00"></span>Milník appky</div>
+      <div class="li"><span class="sw" style="background:#56B4E9"></span>Zaznamenaný výsledek</div>
     </div>
     <div id="dayDetail">${detail}</div>
   `;
@@ -2448,14 +2558,23 @@ function renderDayDetail(dateStr){
   const dayMatches = calendarMatches().filter(m=>m.date_key===dateStr);
   const dayBets = bets.filter(b=>(b.date_key || (b.date && b.date.slice(0,10)))===dateStr);
   const dayEvents = eventsFor(dateStr);
+  const dayResults = RESULT_LOG.filter(r=> localDateStr(new Date(r.start_time))===dateStr);
   const d = new Date(dateStr);
   return `
     <div class="section-lbl">${d.toLocaleDateString('cs-CZ',{weekday:'long', day:'numeric', month:'long'})}</div>
     ${dayEvents.length ? `<div class="hero-tip" style="margin-bottom:16px; padding:16px;">${dayEvents.map(e=>`<div style="font-size:16px; font-weight:700;">${e.emoji} ${e.label}</div>`).join('')}</div>` : ''}
+    ${dayResults.length ? `
+      <div class="section-lbl" style="margin-top:0;">🎯 Jak appka trefila</div>
+      <div style="margin-bottom:14px;">${dayResults.map(r=>{
+        const hit = r.result === r.recommended_outcome;
+        const resultLabel = r.result==='home' ? r.home_team : r.result==='draw' ? 'Remíza' : r.away_team;
+        return `<div class="bet-row"><div><b>${r.home_team} vs ${r.away_team}</b><br><span style="color:var(--text-2)">Tip appky: ${r.recommended_label} · Skutečnost: ${resultLabel}</span></div><span class="st ${hit?'win':'lose'}">${hit?'Trefeno':'Netrefeno'}</span></div>`;
+      }).join('')}</div>
+    ` : ''}
     ${dayBets.length ? `<div style="margin-bottom:14px;">${dayBets.map(b=>`
       <div class="bet-row"><div><b>${b.match}</b><br><span style="color:var(--text-2)">${b.selection} @ ${b.odds.toFixed(2)} · ${fmtCzk(b.stake)}</span></div><span class="st ${b.status}">${b.status==='open'?'Otevřená':b.status==='win'?'Vyhrál':'Prohrál'}</span></div>
     `).join('')}</div>` : ''}
-    ${dayMatches.length ? `<div class="match-grid">${dayMatches.map(safeMatchCardHtml).join('')}</div>` : `<div class="empty-state"><div class="big">📭</div><div class="t">Žádné zápasy tento den</div></div>`}
+    ${dayMatches.length ? `<div class="match-grid">${dayMatches.map(safeMatchCardHtml).join('')}</div>` : (dayResults.length || dayBets.length ? '' : `<div class="empty-state"><div class="big">📭</div><div class="t">Žádné zápasy tento den</div></div>`)}
   `;
 }
 
@@ -2712,6 +2831,7 @@ function openModalInner(id){
       <div class="note-box" style="margin-bottom:16px; border-color:rgba(99,214,160,.35);">
         <b style="color:var(--emerald);">👉 Doporučení appky: ${topLabel}</b>
         <p style="margin:6px 0 0; font-size:12.5px; line-height:1.6; color:var(--text-2);">${strength} favorité podle našeho odhadu (${(topP*100).toFixed(0)} %). ${m._tier==='skip' ? 'Kurz na tenhle výsledek ale zrovna nenabízí matematickou výhodu (value) — appka doporučuje výsledek, ne nutně sázku.' : ''}${m._tier==='research' ? 'Appka na tenhle zápas nemá reálný kurz od kurzové kanceláře, takže "value" (EV) tu nejde poctivě spočítat — je to jen výzkumný odhad.' : ''}</p>
+        ${m._tier!=='skip' && m._tier!=='research' && topOutcome!==m._best.outcome ? `<p style="margin:8px 0 0; font-size:12px; line-height:1.5; color:var(--gold);">💡 Pozor, tohle je jiný výsledek než zelený kurz v tabulce výš — appka tam zvýrazňuje nejlepší <b>matematickou výhodu (EV)</b>, tady doporučuje <b>nejpravděpodobnější výsledek</b>. Obojí je platný signál, jen odpovídá na jinou otázku.</p>` : ''}
       </div>
       <div class="stat-grid">
         <div class="stat-box"><div class="v" style="color:${m._tier!=='skip' && m._tier!=='research' ?'var(--emerald)':'var(--text-2)'}">${m._tier==='research' ? '—' : fmtPct(m._best.ev)}</div><div class="l">${m._tier==='research' ? 'EV (bez reálného kurzu)' : `EV (${bookmakerLabel(m._best.book)})`}</div></div>
@@ -3192,7 +3312,7 @@ setInterval(tickAge, 15000); tickAge();
 
 /* ============================= INIT ============================= */
 function renderAll(){
-  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderMyBets, renderCalendar, renderRound, renderSettings, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
+  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderMyBets, renderCalendar, renderRound, renderProfile, renderSettings, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
   for(const step of steps){
     try{ step(); }
     catch(e){ console.debug('[Precyz] render step failed, continuing with the rest:', step.name, e && e.message); }
