@@ -274,6 +274,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
   transition:all .25s var(--ease); white-space:nowrap;
 }
 .pill.active{color:#100b07; background:var(--pill-color,var(--gold)); border-color:transparent;}
+.logout-short{display:none;}
 .back-btn{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); margin-bottom:14px; font-weight:600;}
 .back-btn:hover{color:var(--text);}
 
@@ -692,16 +693,24 @@ button:focus-visible, input:focus-visible{
 @keyframes authIn{ from{opacity:0; transform:translateY(16px) scale(.97);} to{opacity:1; transform:translateY(0) scale(1);} }
 
 @media(max-width:600px){
-  header{padding:10px 14px;}
-  .brand{gap:7px;}
-  .header-right{gap:6px;}
+  header{padding:10px 12px;}
+  .brand{gap:6px;}
+  .header-right{gap:5px;}
   .panel{padding:14px 12px calc(88px + env(safe-area-inset-bottom));}
   .clock{display:none;}
-  .age-chip{padding:5px 8px; font-size:10px; gap:4px;}
-  .age-chip span:last-child{max-width:74px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  #logoutBtn{padding:6px 10px; font-size:10.5px;}
+  #seasonalBadge, #moodBadge{display:none;}
   .wordmark{font-size:15px;}
-  .logo{width:30px; height:30px;}
+  .logo{width:28px; height:28px;}
+
+  /* age-chip na mobilu je jen tečka — text zabíral moc místa a headers se přetékal mimo obrazovku */
+  .age-chip{padding:6px; gap:0; border-radius:50%; width:26px; height:26px; justify-content:center;}
+  .age-chip span:last-child{display:none;}
+
+  /* logout jako ikona místo textu "Odhlásit", ať se do headeru vejde i s ostatními tlačítky */
+  .logout-full{display:none;}
+  .logout-short{display:inline;}
+  #logoutBtn{padding:6px 10px; font-size:14px;}
+
   #chatBtn, [onclick="showHelpModal()"]{padding:6px 9px; font-size:13px;}
 
   /* --- Dock: navigace dolů, jako pořádná mobilní appka, ne natlačená lišta nahoře --- */
@@ -750,7 +759,7 @@ button:focus-visible, input:focus-visible{
       <div class="age-chip"><span class="dot-live"></span><span id="ageChip">Kurzy: před chvílí</span></div>
       <button class="pill" id="chatBtn" style="margin-left:6px; position:relative;" onclick="toggleChat()" title="Chat hráčů" aria-label="Chat hráčů">💬<span id="chatUnread" class="tab-badge" style="display:none; position:absolute; top:-5px; right:-5px;"></span></button>
       <button class="pill" style="margin-left:6px;" onclick="showHelpModal()" title="Nápověda" aria-label="Nápověda">?</button>
-      <button id="logoutBtn" class="pill" style="margin-left:6px;" onclick="doLogout()">Odhlásit</button>
+      <button id="logoutBtn" class="pill" style="margin-left:6px;" onclick="doLogout()"><span class="logout-full">Odhlásit</span><span class="logout-short">⏻</span></button>
     </div>
   </header>
 
