@@ -664,7 +664,7 @@ button:active, .cat-tile:active, .card:active, .pill:active{
 
 /* pager parallax — non-active panels ease back slightly for depth */
 .panel{ transition:transform .1s linear, opacity .1s linear; will-change:transform, opacity; }
-.panel-enter{ animation:panelEnter .45s cubic-bezier(.16,1,.3,1); }
+.panel-enter{ animation:panelEnter .38s cubic-bezier(.22,.61,.36,1); }
 @keyframes panelEnter{
   from{ opacity:0; transform:translateY(10px) scale(.99); }
   to{ opacity:1; transform:translateY(0) scale(1); }
@@ -686,7 +686,7 @@ button:focus-visible, input:focus-visible{
 }
 
 /* segmented thumb: a touch more spring on release */
-.seg-thumb{ transition:transform .42s var(--spring), width .42s var(--spring); }
+.seg-thumb{ transition:transform .36s cubic-bezier(.22,.61,.36,1), width .36s cubic-bezier(.22,.61,.36,1); }
 
 /* auth card entrance */
 .auth-card{ animation:authIn .45s var(--spring); }
@@ -3371,6 +3371,24 @@ function panelTarget(i){
   const p = panelEls[i];
   return p ? p.offsetLeft : i*pagerEl.clientWidth;
 }
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+let smoothScrollRaf = null;
+function smoothScrollPagerTo(target, duration=360){
+  // vlastní rAF scroll s easingem — nativní scrollTo({behavior:'smooth'}) je na řadě
+  // mobilních prohlížečů trhaný nebo neřiditelný, tohle je konzistentně plynulé všude
+  if(smoothScrollRaf) cancelAnimationFrame(smoothScrollRaf);
+  const start = pagerEl.scrollLeft;
+  const delta = target - start;
+  if(Math.abs(delta) < 1) return;
+  const startTime = performance.now();
+  function step(now){
+    const t = Math.min(1, (now-startTime)/duration);
+    pagerEl.scrollLeft = start + delta*easeInOutCubic(t);
+    if(t < 1){ smoothScrollRaf = requestAnimationFrame(step); }
+    else{ smoothScrollRaf = null; }
+  }
+  smoothScrollRaf = requestAnimationFrame(step);
+}
 function setActiveTab(i, scroll=true){
   state.tab = i;
   segBtns.forEach((b,idx)=>{
@@ -3380,7 +3398,7 @@ function setActiveTab(i, scroll=true){
   positionThumb(i);
   if(i===1) markValueSeen();
   if(scroll){
-    pagerEl.scrollTo({left: panelTarget(i), behavior:'smooth'});
+    smoothScrollPagerTo(panelTarget(i));
     const targetPanel = document.querySelectorAll('.panel')[i];
     if(targetPanel){
       targetPanel.classList.remove('panel-enter');
@@ -3773,6 +3791,7 @@ function isStandalone(){
   catch(e){ return false; }
 }
 function maybeShowInstallHint(){
+  return; // appka aktivně nenabízí instalaci — banner vypnutý na žádost
   if(isStandalone()) return; // už nainstalovaná, appka běží samostatně
   try{ if(localStorage.getItem('precyz_install_dismissed_v1')) return; }catch(e){}
   if(!deferredInstallPrompt && !isIOS()) return; // Android/desktop bez podpory instalace — nic neukazovat
