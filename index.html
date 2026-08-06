@@ -1117,7 +1117,7 @@ async function renderSyncStatusBox(){
       return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Automatika zápasů (<span class="mono">sync-matches</span>) ještě nikdy neproběhla. Spusť ji ručně přes „Test" ve Supabase, nebo nastav cron.</div>`;
     }
     const ageMin = Math.floor((Date.now() - new Date(data.last_run_at).getTime())/60000);
-    const stale = ageMin > 150; // cron má běžet po hodině — přes 2.5h bez běhu = podezřelé
+    const stale = ageMin > 570; // cron teď běží každých 8 h — přes 9.5h bez běhu = podezřelé
     const ageTxt = ageMin < 60 ? `${ageMin} min` : `${Math.floor(ageMin/60)} h ${ageMin%60} min`;
     if(!data.last_run_ok){
       return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Poslední běh automatiky <b>selhal</b> (před ${ageTxt}). Detail: <span class="mono">${(data.last_run_detail&&data.last_run_detail.error)||'neznámá chyba'}</span></div>`;
@@ -3444,9 +3444,9 @@ function tickAge(){
   if(lastSyncAt === null){ el.textContent = 'Kurzy: —'; return; }
   const diffMin = Math.floor((Date.now()-lastSyncAt)/60000);
   el.textContent = formatAge(diffMin);
-  // cron má běžet po hodině — přes 3h bez běhu je vidět i pro běžného uživatele,
+  // cron teď běží každých 8 h — přes 9.5h bez běhu je vidět i pro běžného uživatele,
   // ne jen v admin panelu
-  const stale = diffMin > 180;
+  const stale = diffMin > 570;
   el.style.color = stale ? 'var(--red)' : '';
   if(dot) dot.style.background = stale ? 'var(--red)' : 'var(--emerald)';
 }
