@@ -732,6 +732,22 @@ button:focus-visible, input:focus-visible{
   .seg-label-full{display:none;}
   .seg-label-short{display:block;}
   .tab-badge{position:absolute; top:1px; right:6px; margin-left:0;}
+
+  /* --- Detail zápasu (modal): méně vyplýtvaného prostoru, méně scrollování --- */
+  .modal{padding:16px; max-height:92vh; border-radius:18px 18px 0 0;}
+  .modal h2{font-size:17px;}
+  .modal .subrow{margin-bottom:12px;}
+  .modal-close{top:12px; right:12px; width:28px; height:28px; font-size:14px;}
+  .modal-tabs{margin-bottom:12px; padding:3px;}
+  .modal-tab{padding:8px 6px; font-size:11.5px;}
+  .odds-table-wrap{margin-bottom:12px;}
+  .odds-table th{padding:5px 6px; font-size:9.5px;}
+  .odds-table td{padding:7px 6px; font-size:12px;}
+  .note-box{padding:10px 12px; margin-bottom:12px; font-size:11px;}
+  .stat-grid{gap:7px; margin-bottom:12px;}
+  .stat-box{padding:9px;}
+  .stat-box .v{font-size:14px;}
+  .bet-form{padding:14px;}
 }
 @media(max-width:360px){
   .seg-btn{min-width:52px; padding:6px 3px 5px;}
@@ -2995,9 +3011,9 @@ function openModalInner(id){
 
     <div class="modal-tabs" role="tablist">
       <button class="modal-tab active" data-mtab="result" onclick="switchModalTab('result')">Výsledek</button>
-      <button class="modal-tab" data-mtab="goals" onclick="switchModalTab('goals')">Góly</button>
-      <button class="modal-tab" data-mtab="corners" onclick="switchModalTab('corners')">Rohy</button>
-      <button class="modal-tab" data-mtab="cards" onclick="switchModalTab('cards')">Karty</button>
+      ${m.sport==='football' || m.sport==='hockey' || m.sport==='basketball' ? `<button class="modal-tab" data-mtab="goals" onclick="switchModalTab('goals')">${m.sport==='basketball'?'Body':'Góly'}</button>` : ''}
+      ${m.sport==='football' ? `<button class="modal-tab" data-mtab="corners" onclick="switchModalTab('corners')">Rohy</button>` : ''}
+      ${m.sport==='football' || m.sport==='hockey' ? `<button class="modal-tab" data-mtab="cards" onclick="switchModalTab('cards')">Karty</button>` : ''}
     </div>
 
     <div class="modal-tab-panel" data-mpanel="result">
@@ -3020,19 +3036,22 @@ function openModalInner(id){
       ${m._tier==='research' ? `<p class="subtle" style="margin-top:8px;">Kelly vklad počítá optimální sázku z ověřené výhody nad trhem — bez reálného kurzu appka nemá z čeho vycházet, takže radši neukazuje vymyšlené číslo. Vsadit můžeš i tak, jen appka nedoporučí konkrétní částku.</p>` : ''}
     </div>
 
+    ${(m.sport==='football' || m.sport==='hockey' || m.sport==='basketball') ? `
     <div class="modal-tab-panel" data-mpanel="goals" style="display:none;">
-      ${ouBox(m.over_under, 'Góly — Over/Under', '⚽')}
-      ${btts || `<p class="subtle">Appka zatím nemá odhad na "dá gól i druhý tým" pro tenhle zápas.</p>`}
-    </div>
+      ${ouBox(m.over_under, m.sport==='basketball' ? 'Body — Over/Under' : 'Góly — Over/Under', m.sport==='basketball' ? '🏀' : '⚽')}
+      ${m.sport==='football' ? (btts || `<p class="subtle">Appka zatím nemá odhad na "dá gól i druhý tým" pro tenhle zápas.</p>`) : ''}
+    </div>` : ''}
 
+    ${m.sport==='football' ? `
     <div class="modal-tab-panel" data-mpanel="corners" style="display:none;">
       ${m.corners_ou ? ouBox(m.corners_ou, 'Rohy — Over/Under', '🚩') : `<p class="subtle">Appka zatím pro tenhle zápas nemá spolehlivá data na rohy.</p>`}
       ${cornersWinner}
-    </div>
+    </div>` : ''}
 
+    ${(m.sport==='football' || m.sport==='hockey') ? `
     <div class="modal-tab-panel" data-mpanel="cards" style="display:none;">
-      ${ouBox(m.cards_over_under, 'Karty — Over/Under', '🟨')}
-    </div>
+      ${m.cards_over_under ? ouBox(m.cards_over_under, 'Karty — Over/Under', '🟨') : `<p class="subtle">Appka zatím pro tenhle zápas nemá spolehlivá data na karty.</p>`}
+    </div>` : ''}
 
     ${researchHtml}
 
