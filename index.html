@@ -186,17 +186,21 @@ header{
 
 /* pager */
 .pager{
-  flex:1; display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
+  flex:1; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
   /* scroll-behavior:smooth ODSTRANENO — bojovalo s vlastnim rAF animatorem:
      kazde nastaveni scrollLeft spoustelo novou nativni smooth animaci
-     pres tu bezici => viditelne skubani pri prepinani zalozek. */
+     pres tu bezici => viditelne skubani pri prepinani zalozek.
+     align-items:flex-start — bez tohoto flex řádek roztahoval VŠECHNY
+     panely na výšku toho nejdelšího (Value/Přehled), takže třeba Kolo
+     nebo Radar měly zbytečné prázdné místo dole při scrollování. Teď
+     má každá záložka vlastní přirozenou výšku podle svého obsahu. */
 }
 .pager.is-animating{ scroll-snap-type:none; }
 .pager::-webkit-scrollbar{display:none;}
 .panel{
   flex:0 0 100%; width:100%; scroll-snap-align:start;
-  padding:22px 20px 80px; max-width:1300px; margin:0 auto; min-height:60vh;
+  padding:22px 20px 80px; max-width:1300px; margin:0 auto; min-height:40vh;
 }
 @media(min-width:1000px){ .panel{padding:32px 32px 100px;} }
 
