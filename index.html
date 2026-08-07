@@ -75,7 +75,10 @@ button{font-family:inherit; cursor:pointer; border:none; background:none; color:
 /* ambient mesh background */
 .mesh{position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
 .mesh::before, .mesh::after, .mesh .blob{
-  content:''; position:absolute; border-radius:50%; filter:blur(60px); opacity:.55;
+  content:''; position:absolute; border-radius:50%; opacity:.55;
+  /* filter:blur() odstranen — radial-gradient je uz mekky sam o sobe.
+     Blur na animovane vrstve nutil GPU prepocitat rozmazani kazdy snimek. */
+  transform:translate3d(0,0,0); backface-visibility:hidden;
 }
 .mesh::before{
   width:60vw; height:60vw; top:-20vw; left:-10vw;
@@ -92,9 +95,9 @@ button{font-family:inherit; cursor:pointer; border:none; background:none; color:
   background:radial-gradient(circle, rgba(185,167,255,.14), transparent 70%);
   animation:drift3 40s ease-in-out infinite;
 }
-@keyframes drift1{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(4vw,3vw) scale(1.15);}}
-@keyframes drift2{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-5vw,2vw) scale(1.1);}}
-@keyframes drift3{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-3vw,-4vw) scale(1.2);}}
+@keyframes drift1{0%,100%{transform:translate3d(0,0,0);}50%{transform:translate3d(4vw,3vw,0);}}
+@keyframes drift2{0%,100%{transform:translate3d(0,0,0);}50%{transform:translate3d(-5vw,2vw,0);}}
+@keyframes drift3{0%,100%{transform:translate3d(0,0,0);}50%{transform:translate3d(-3vw,-4vw,0);}}
 .vignette{position:fixed; inset:0; z-index:1; pointer-events:none;
   background:radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(16,11,7,.6) 100%);}
 
@@ -104,7 +107,7 @@ header{
   position:sticky; top:0; z-index:50;
   display:flex; align-items:center; justify-content:space-between;
   padding:calc(14px + env(safe-area-inset-top)) 20px 14px;
-  background:rgba(16,11,7,.72); backdrop-filter:blur(18px) saturate(140%);
+  background:rgba(16,11,7,.78); backdrop-filter:blur(12px);
   border-bottom:1px solid var(--stroke);
 }
 .brand{display:flex; align-items:center; gap:10px;}
@@ -184,8 +187,12 @@ header{
 /* pager */
 .pager{
   flex:1; display:flex; overflow-x:auto; scroll-snap-type:x mandatory;
-  scroll-behavior:smooth; -webkit-overflow-scrolling:touch;
+  -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
+  /* scroll-behavior:smooth ODSTRANENO — bojovalo s vlastnim rAF animatorem:
+     kazde nastaveni scrollLeft spoustelo novou nativni smooth animaci
+     pres tu bezici => viditelne skubani pri prepinani zalozek. */
 }
+.pager.is-animating{ scroll-snap-type:none; }
 .pager::-webkit-scrollbar{display:none;}
 .panel{
   flex:0 0 100%; width:100%; scroll-snap-align:start;
@@ -233,8 +240,8 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 /* hero tip card */
 .hero-tip{
   background:linear-gradient(115deg, rgba(255,190,114,.16), rgba(185,167,255,.08), rgba(255,190,114,.12));
-  background-size:200% 200%;
-  animation:heroGradient 8s ease-in-out infinite;
+  /* animace background-position odstranena — prekreslovala celou kartu kazdy
+     snimek donekonecna. Zivot karte dodava sviticí prejezd (::before) na GPU. */
   border:1px solid var(--stroke-2); border-radius:24px; padding:26px 24px; margin-bottom:24px;
   position:relative; overflow:hidden; transition:transform .25s var(--ease), border-color .25s;
 }
@@ -246,14 +253,16 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
   100%{background-position:0% 50%;}
 }
 .hero-tip::before{
-  content:''; position:absolute; top:0; left:-60%; width:40%; height:100%;
+  content:''; position:absolute; top:0; left:0; width:40%; height:100%;
   background:linear-gradient(115deg, transparent, rgba(255,255,255,.07), transparent);
   animation:heroShine 6s ease-in-out infinite;
-  pointer-events:none;
+  pointer-events:none; will-change:transform;
 }
 @keyframes heroShine{
-  0%, 30%{left:-60%;}
-  70%, 100%{left:140%;}
+  /* driv se animovala vlastnost 'left' => prohlizec prepocitaval layout
+     kazdy snimek, donekonecna. translate3d bezi cistě na GPU. */
+  0%, 30%{transform:translate3d(-160%,0,0);}
+  70%, 100%{transform:translate3d(350%,0,0);}
 }
 .hero-tip .eyebrow{font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--gold); font-weight:700; margin-bottom:10px; position:relative;}
 .hero-tip .teams{font-size:24px; font-weight:800; margin-bottom:6px; letter-spacing:-.3px; position:relative;}
@@ -663,7 +672,11 @@ button:active, .cat-tile:active, .card:active, .pill:active{
 .skeleton-card{ height:150px; }
 
 /* pager parallax — non-active panels ease back slightly for depth */
-.panel{ transition:transform .1s linear, opacity .1s linear; will-change:transform, opacity; }
+.panel{ contain:layout; }
+/* will-change:transform,opacity ODSTRANENO — drzelo 8 celoobrazovkovych vrstev
+   trvale v pameti GPU. Na mobilu to znamenalo zahlceni a trhani vseho ostatniho.
+   Vrstvu si vynutime jen na okamzik behem prepinani (trida .is-animating). */
+.pager.is-animating .panel{ will-change:transform; }
 .panel-enter{ animation:panelEnter .38s cubic-bezier(.22,.61,.36,1); }
 @keyframes panelEnter{
   from{ opacity:0; transform:translateY(10px) scale(.99); }
@@ -732,12 +745,93 @@ button:focus-visible, input:focus-visible{
   .seg-label-full{display:none;}
   .seg-label-short{display:block;}
   .tab-badge{position:absolute; top:1px; right:6px; margin-left:0;}
+
+  /* --- Detail zápasu (modal): méně vyplýtvaného prostoru, méně scrollování --- */
+  .modal{padding:16px; max-height:92vh; border-radius:18px 18px 0 0;}
+  .modal h2{font-size:17px;}
+  .modal .subrow{margin-bottom:12px;}
+  .modal-close{top:12px; right:12px; width:28px; height:28px; font-size:14px;}
+  .modal-tabs{margin-bottom:12px; padding:3px;}
+  .modal-tab{padding:8px 6px; font-size:11.5px;}
+  .odds-table-wrap{margin-bottom:12px;}
+  .odds-table th{padding:5px 6px; font-size:9.5px;}
+  .odds-table td{padding:7px 6px; font-size:12px;}
+  .note-box{padding:10px 12px; margin-bottom:12px; font-size:11px;}
+  .stat-grid{gap:7px; margin-bottom:12px;}
+  .stat-box{padding:9px;}
+  .stat-box .v{font-size:14px;}
+  .bet-form{padding:14px;}
 }
 @media(max-width:360px){
   .seg-btn{min-width:52px; padding:6px 3px 5px;}
   .seg-icon{font-size:16px;}
   .seg-label{font-size:8.5px;}
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOTION SYSTEM — sjednocení pohybu napříč appkou
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 1) Hover efekty POUZE tam, kde existuje skutečný kurzor.
+   Na dotykovém displeji prohlížeč "hover" simuluje při ťuknutí a efekt
+   pak na kartě zůstane viset, dokud nekliknete jinam — působilo to
+   rozbitě a je to jeden z hlavních důvodů, proč appka nepůsobila hotově. */
+@media (hover:none){
+  .card:hover, .cat-tile:hover, .kpi:hover, .hero-tip:hover{
+    transform:none; border-color:var(--stroke-2);
+  }
+}
+
+/* 2) Odezva na dotek — okamžitá, bez 300ms prodlevy prohlížeče.
+   Tohle je rozdíl mezi "appka reaguje" a "appka je pomalá". */
+button, .seg-btn, .card, .cat-tile, .kpi, .pill, .cal-cell, .lb-row, .feed-row, a{
+  touch-action:manipulation;
+}
+.card:active, .cat-tile:active, .kpi:active{
+  transform:scale(.985);
+  transition-duration:.09s;
+}
+button:active, .seg-btn:active{ transform:scale(.96); transition-duration:.08s; }
+
+/* 3) Izolace karet — změna v jedné kartě nenutí prohlížeč přepočítat
+   layout celé stránky. Znát je to hlavně u dlouhých seznamů zápasů. */
+.card, .cat-tile, .kpi, .lb-row, .feed-row{ contain:layout style; }
+
+/* 4) Vstup karet — jemnější a rychlejší.
+   Kratší dráha (14px→8px) a bez scale působí svižněji a nerozmazává text. */
+@keyframes cardIn{
+  from{ opacity:0; transform:translate3d(0,8px,0); }
+  to{ opacity:1; transform:translate3d(0,0,0); }
+}
+@keyframes panelEnter{
+  from{ opacity:0; transform:translate3d(0,6px,0); }
+  to{ opacity:1; transform:translate3d(0,0,0); }
+}
+
+/* 5) Kratší, hustší kaskáda — 6 karet naskočí za 0,18s místo 0,30s.
+   Dlouhé čekání na poslední kartu působilo jako sekání. */
+.match-grid > *:nth-child(1),.cat-grid > *:nth-child(1){animation-delay:.00s;}
+.match-grid > *:nth-child(2),.cat-grid > *:nth-child(2){animation-delay:.035s;}
+.match-grid > *:nth-child(3),.cat-grid > *:nth-child(3){animation-delay:.07s;}
+.match-grid > *:nth-child(4),.cat-grid > *:nth-child(4){animation-delay:.105s;}
+.match-grid > *:nth-child(5),.cat-grid > *:nth-child(5){animation-delay:.14s;}
+.match-grid > *:nth-child(6),.cat-grid > *:nth-child(6){animation-delay:.175s;}
+.match-grid > *:nth-child(n+7){animation-delay:.19s;}
+
+/* 6) Mobil: ambientní pozadí zmrazíme.
+   Tři velké vrstvy v nekonečné smyčce ukrajovaly výkon i při pouhém
+   scrollování. Vizuálně se nic neztratí — zůstanou staticky na místě. */
+@media (max-width:600px){
+  .mesh::before, .mesh::after, .mesh .blob{ animation:none !important; }
+  .navwrap{ backdrop-filter:blur(8px); }
+  header{ backdrop-filter:blur(10px); }
+}
+
+/* 7) Šetření výkonu, když appka není vidět (jiná záložka prohlížeče). */
+@media (prefers-reduced-motion: no-preference){
+  .mesh::before, .mesh::after, .mesh .blob{ animation-play-state:running; }
+}
+
 </style>
 </head>
 <body>
@@ -2995,9 +3089,9 @@ function openModalInner(id){
 
     <div class="modal-tabs" role="tablist">
       <button class="modal-tab active" data-mtab="result" onclick="switchModalTab('result')">Výsledek</button>
-      <button class="modal-tab" data-mtab="goals" onclick="switchModalTab('goals')">Góly</button>
-      <button class="modal-tab" data-mtab="corners" onclick="switchModalTab('corners')">Rohy</button>
-      <button class="modal-tab" data-mtab="cards" onclick="switchModalTab('cards')">Karty</button>
+      ${m.sport==='football' || m.sport==='hockey' || m.sport==='basketball' ? `<button class="modal-tab" data-mtab="goals" onclick="switchModalTab('goals')">${m.sport==='basketball'?'Body':'Góly'}</button>` : ''}
+      ${m.sport==='football' ? `<button class="modal-tab" data-mtab="corners" onclick="switchModalTab('corners')">Rohy</button>` : ''}
+      ${m.sport==='football' || m.sport==='hockey' ? `<button class="modal-tab" data-mtab="cards" onclick="switchModalTab('cards')">Karty</button>` : ''}
     </div>
 
     <div class="modal-tab-panel" data-mpanel="result">
@@ -3020,19 +3114,22 @@ function openModalInner(id){
       ${m._tier==='research' ? `<p class="subtle" style="margin-top:8px;">Kelly vklad počítá optimální sázku z ověřené výhody nad trhem — bez reálného kurzu appka nemá z čeho vycházet, takže radši neukazuje vymyšlené číslo. Vsadit můžeš i tak, jen appka nedoporučí konkrétní částku.</p>` : ''}
     </div>
 
+    ${(m.sport==='football' || m.sport==='hockey' || m.sport==='basketball') ? `
     <div class="modal-tab-panel" data-mpanel="goals" style="display:none;">
-      ${ouBox(m.over_under, 'Góly — Over/Under', '⚽')}
-      ${btts || `<p class="subtle">Appka zatím nemá odhad na "dá gól i druhý tým" pro tenhle zápas.</p>`}
-    </div>
+      ${ouBox(m.over_under, m.sport==='basketball' ? 'Body — Over/Under' : 'Góly — Over/Under', m.sport==='basketball' ? '🏀' : '⚽')}
+      ${m.sport==='football' ? (btts || `<p class="subtle">Appka zatím nemá odhad na "dá gól i druhý tým" pro tenhle zápas.</p>`) : ''}
+    </div>` : ''}
 
+    ${m.sport==='football' ? `
     <div class="modal-tab-panel" data-mpanel="corners" style="display:none;">
       ${m.corners_ou ? ouBox(m.corners_ou, 'Rohy — Over/Under', '🚩') : `<p class="subtle">Appka zatím pro tenhle zápas nemá spolehlivá data na rohy.</p>`}
       ${cornersWinner}
-    </div>
+    </div>` : ''}
 
+    ${(m.sport==='football' || m.sport==='hockey') ? `
     <div class="modal-tab-panel" data-mpanel="cards" style="display:none;">
-      ${ouBox(m.cards_over_under, 'Karty — Over/Under', '🟨')}
-    </div>
+      ${m.cards_over_under ? ouBox(m.cards_over_under, 'Karty — Over/Under', '🟨') : `<p class="subtle">Appka zatím pro tenhle zápas nemá spolehlivá data na karty.</p>`}
+    </div>` : ''}
 
     ${researchHtml}
 
@@ -3373,21 +3470,35 @@ function panelTarget(i){
 }
 function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
 let smoothScrollRaf = null;
-function smoothScrollPagerTo(target, duration=360){
-  // vlastní rAF scroll s easingem — nativní scrollTo({behavior:'smooth'}) je na řadě
-  // mobilních prohlížečů trhaný nebo neřiditelný, tohle je konzistentně plynulé všude
+function smoothScrollPagerTo(target, duration=340){
+  // Vlastní rAF scroll. Klíčové: po dobu animace vypneme scroll-snap (třída
+  // .is-animating), protože snap během programového scrollu "přitahoval"
+  // pozici zpět a působil trhání. Zároveň si jen na tu chvíli vynutíme
+  // kompozitní vrstvu a po dojetí ji zase pustíme.
   if(smoothScrollRaf) cancelAnimationFrame(smoothScrollRaf);
   const start = pagerEl.scrollLeft;
   const delta = target - start;
   if(Math.abs(delta) < 1) return;
+  if(prefersReducedMotion()){ pagerEl.scrollLeft = target; return; }
+  pagerEl.classList.add('is-animating');
   const startTime = performance.now();
   function step(now){
     const t = Math.min(1, (now-startTime)/duration);
-    pagerEl.scrollLeft = start + delta*easeInOutCubic(t);
+    pagerEl.scrollLeft = start + delta*easeOutQuint(t);
     if(t < 1){ smoothScrollRaf = requestAnimationFrame(step); }
-    else{ smoothScrollRaf = null; }
+    else{
+      smoothScrollRaf = null;
+      pagerEl.scrollLeft = target;      // dosedne přesně, žádný subpixel posun
+      pagerEl.classList.remove('is-animating');
+    }
   }
   smoothScrollRaf = requestAnimationFrame(step);
+}
+// easeOutQuint: rychlý rozjezd, dlouhé měkké dosednutí — působí svižněji
+// než symetrický easeInOutCubic, který na začátku "váhá".
+function easeOutQuint(t){ return 1 - Math.pow(1-t, 5); }
+function prefersReducedMotion(){
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 function setActiveTab(i, scroll=true){
   state.tab = i;
