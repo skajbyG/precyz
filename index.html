@@ -188,13 +188,18 @@ header{
 .pager{
   flex:1; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
+  transition:height .32s var(--ease);
   /* scroll-behavior:smooth ODSTRANENO — bojovalo s vlastnim rAF animatorem:
      kazde nastaveni scrollLeft spoustelo novou nativni smooth animaci
      pres tu bezici => viditelne skubani pri prepinani zalozek.
-     align-items:flex-start — bez tohoto flex řádek roztahoval VŠECHNY
-     panely na výšku toho nejdelšího (Value/Přehled), takže třeba Kolo
-     nebo Radar měly zbytečné prázdné místo dole při scrollování. Teď
-     má každá záložka vlastní přirozenou výšku podle svého obsahu. */
+     align-items:flex-start — zabranuje NATAHOVANI jednotlivych panelu na
+     vysku nejdelsiho sourozene, ale samotny KONTEJNER (.pager) tim jeste
+     neni vyresen: ve flex-row layoutu, kde vsech 8 panelu existuje v DOM
+     soucasne vedle sebe (kvuli vodorovnemu swipe mezi zalozkami), se
+     vyska KONTEJNERU porad automaticky rovna vysce nejvyssiho panelu.
+     To je skutecna prevalujici prazdnota. Reseni: JS aktivne meri
+     vysku PRAVE AKTIVNIHO panelu a explicitne ji nastavuje na .pager
+     (viz funkci syncPagerHeight v JS níže). */
 }
 .pager.is-animating{ scroll-snap-type:none; }
 .pager::-webkit-scrollbar{display:none;}
@@ -3504,6 +3509,17 @@ function easeOutQuint(t){ return 1 - Math.pow(1-t, 5); }
 function prefersReducedMotion(){
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+/* Měří přirozenou výšku PRÁVĚ AKTIVNÍHO panelu a nastaví ji na .pager.
+   Bez tohohle kontejner zůstává vysoký jako nejdelší ze všech 8 záložek
+   (viz komentář u .pager v <style>), i když se align-items:flex-start
+   postaralo, že se samotný panel netahá. */
+function syncPagerHeight(){
+  const active = panelEls[state.tab];
+  if(!active) return;
+  const h = active.offsetHeight;
+  if(h > 0) pagerEl.style.height = h + 'px';
+}
+
 function setActiveTab(i, scroll=true){
   state.tab = i;
   segBtns.forEach((b,idx)=>{
@@ -3512,6 +3528,8 @@ function setActiveTab(i, scroll=true){
   });
   positionThumb(i);
   if(i===1) markValueSeen();
+  syncPagerHeight();
+  if(typeof watchActivePanelResize === 'function') watchActivePanelResize();
   if(scroll){
     smoothScrollPagerTo(panelTarget(i));
     const targetPanel = document.querySelectorAll('.panel')[i];
@@ -3563,15 +3581,27 @@ pagerEl.addEventListener('scroll', ()=>{
 requestAnimationFrame(applyParallax);
 
 /* auto-fade: whenever any panel's innerHTML is replaced by a render function, gently fade the
-   new content in — covers every render*() call site without editing each one individually */
-panelEls.forEach(panel=>{
+   new content in — covers every render*() call site without editing each one individually.
+   Zároveň: pokud se změní obsah PRÁVĚ AKTIVNÍHO panelu (např. dohrání dat z Supabase, rozbalení
+   sekce), přeměříme a doladíme výšku .pageru — jinak by zůstala prázdnota ze stavu před změnou. */
+panelEls.forEach((panel, idx)=>{
   const mo = new MutationObserver(()=>{
     panel.classList.remove('panel-fade');
     void panel.offsetWidth; // force reflow so the animation restarts
     panel.classList.add('panel-fade');
+    if(idx === state.tab) syncPagerHeight();
   });
   mo.observe(panel, {childList:true});
 });
+/* Doplňkově: sleduj i změny VELIKOSTI aktivního panelu, které nejsou childList mutace
+   (např. obrázek se dogruntuje a zvětší svůj box, accordion se rozbalí přes CSS třídu). */
+const activePanelResizeObserver = new ResizeObserver(()=>{ syncPagerHeight(); });
+function watchActivePanelResize(){
+  activePanelResizeObserver.disconnect();
+  const active = panelEls[state.tab];
+  if(active) activePanelResizeObserver.observe(active);
+}
+watchActivePanelResize();
 
 document.addEventListener('keydown', e=>{
   if(document.getElementById('modalOverlay').classList.contains('open')){
@@ -3772,7 +3802,7 @@ function renderAll(){
   if(currentProfile && currentProfile.role === 'admin'){
     try{ renderAdminPanel(); }catch(e){ console.debug('[Precyz] admin panel render failed:', e && e.message); }
   }
-  requestAnimationFrame(()=>positionThumb(state.tab));
+  requestAnimationFrame(()=>{ positionThumb(state.tab); syncPagerHeight(); });
 }
 function updateSettleBadge(){
   const badge = document.getElementById('settleBadge');
