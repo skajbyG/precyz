@@ -186,7 +186,7 @@ header{
 
 /* pager */
 .pager{
-  flex:1; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory;
+  flex:0 0 auto; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
   transition:height .32s var(--ease);
   /* scroll-behavior:smooth ODSTRANENO — bojovalo s vlastnim rAF animatorem:
@@ -197,9 +197,16 @@ header{
      neni vyresen: ve flex-row layoutu, kde vsech 8 panelu existuje v DOM
      soucasne vedle sebe (kvuli vodorovnemu swipe mezi zalozkami), se
      vyska KONTEJNERU porad automaticky rovna vysce nejvyssiho panelu.
-     To je skutecna prevalujici prazdnota. Reseni: JS aktivne meri
-     vysku PRAVE AKTIVNIHO panelu a explicitne ji nastavuje na .pager
-     (viz funkci syncPagerHeight v JS níže). */
+     Reseni: JS aktivne meri vysku PRAVE AKTIVNIHO panelu a explicitne
+     ji nastavuje na .pager (viz funkci syncPagerHeight v JS níže).
+     KRITICKE: puvodne tu bylo flex:1 — to ve sloupcovem .app kontejneru
+     znamena flex-grow:1 s flex-basis:0%, coz aktivne ROZTAHUJE .pager
+     na zbyvajici misto v okne A PRITOM IGNORUJE jakoukoliv explicitni
+     vysku nastavenou pres JS (flex-grow ma na hlavni ose prednost pred
+     height). Proto se predchozi JS oprava vubec neprojevila — vyska se
+     nastavila, ale flex:1 ji hned zase pretlacil zpet na "vyplnit
+     obrazovku". S flex:0 0 auto uz .pager respektuje svou skutecnou
+     (JS-rizenou) vysku a zbytecne misto zmizi. */
 }
 .pager.is-animating{ scroll-snap-type:none; }
 .pager::-webkit-scrollbar{display:none;}
