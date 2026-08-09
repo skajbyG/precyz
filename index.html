@@ -810,8 +810,19 @@ button:focus-visible, input:focus-visible{
 
 /* 2) Odezva na dotek — okamžitá, bez 300ms prodlevy prohlížeče.
    Tohle je rozdíl mezi "appka reaguje" a "appka je pomalá". */
-button, .seg-btn, .card, .cat-tile, .kpi, .pill, .cal-cell, .lb-row, .feed-row, a{
+button, .seg-btn, a{
   touch-action:manipulation;
+}
+/* Karty, dlaždice, buňky kalendáře a řádky ale ŽIJÍ uvnitř SVISLE
+   scrollovaného obsahu panelu (uvnitř .pageru). Kdyby měly manipulation
+   (ta povoluje i vodorovný posun), přebily by touch-action:pan-y nastavené
+   na .pageru výš ve stromu — a PŘESNĚ TOHLE způsobovalo, že dotek na kartě
+   zápasu / dlaždici / buňce kalendáře uprostřed pokusu sjet dolů appku
+   "unesl" do vedlejší záložky. pan-y zachovává okamžitou odezvu na klepnutí
+   (žádná 300ms prodleva, žádný double-tap zoom), jen navíc garantuje, že
+   vertikální scroll vždycky vyhraje — i když prst začne přesně na kartě. */
+.card, .cat-tile, .kpi, .pill, .cal-cell, .lb-row, .feed-row{
+  touch-action:pan-y;
 }
 .card:active, .cat-tile:active, .kpi:active{
   transform:scale(.985);
@@ -2788,36 +2799,7 @@ function renderCalendar(){
     return d.getFullYear()===y && d.getMonth()===m;
   });
 
-  // nejbližší nadcházející zápasy napříč všemi měsíci — ať appka vždy má co ukázat,
-  // i když je aktuálně zobrazený měsíc řídký
-  const now = Date.now();
-  const upcoming = MATCHES.filter(mt=>new Date(mt.start_time).getTime() >= now)
-    .sort((a,b)=>new Date(a.start_time)-new Date(b.start_time))
-    .slice(0,5);
-
-  const upcomingHtml = upcoming.length ? `
-    <div class="section-lbl">Nejbližší zápasy</div>
-    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:20px;">
-      ${upcoming.map(mt=>`
-        <div class="bet-row" style="cursor:pointer;" onclick="jumpToMatchDay('${mt.date_key}')">
-          <div>
-            <b>${mt.home_team} vs ${mt.away_team}</b><br>
-            <span style="color:var(--text-2)">${COUNTRY[mt.country].flag} ${mt.league}</span>
-          </div>
-          <span class="mono" style="color:var(--text-2); font-size:12px;">${fmtDate(mt.start_time)} · ${fmtTime(mt.start_time)}</span>
-        </div>
-      `).join('')}
-    </div>
-  ` : `
-    <div class="empty-state" style="margin-bottom:20px;">
-      <div class="big">📭</div>
-      <div class="t">Zatím žádné nadcházející zápasy</div>
-      Databáze zápasů je prázdná nebo čeká na další běh automatiky.
-    </div>
-  `;
-
   el.innerHTML = `
-    ${upcomingHtml}
     <div class="cal-head">
       <h2>${MONTHS_CZ[m]} ${y}</h2>
       <div class="cal-nav">
