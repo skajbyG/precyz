@@ -189,7 +189,17 @@ header{
   flex:0 0 auto; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
   transition:height .32s var(--ease);
-  /* scroll-behavior:smooth ODSTRANENO — bojovalo s vlastnim rAF animatorem:
+  touch-action:pan-y;
+  /* touch-action:pan-y — KLÍČOVÉ pro spolehlivé scrollování. Bez tohohle si
+     prohlížeč u KAŽDÉHO doteku sám hádal, jestli gesto patří vodorovnému
+     scrollu záložek (.pager má overflow-x) nebo svislému scrollu stránky.
+     Reálný dotyk prstem skoro nikdy není dokonale svislý, takže prohlížeč
+     občas "commitnul" gesto na vodorovný scroll uprostřed pokusu sjet dolů —
+     appka pak vypadala, že sama přeskakuje mezi záložkami. Tohle řekne
+     prohlížeči: doteky na tomhle prvku ber VŽDY jako svislý scroll stránky,
+     nikdy je nenech unést vodorovným scrollem. Přepínání záložek přes
+     tlačítka nahoře (segBtns) tím není nijak dotčené, jede dál stejně.
+     scroll-behavior:smooth ODSTRANENO — bojovalo s vlastnim rAF animatorem:
      kazde nastaveni scrollLeft spoustelo novou nativni smooth animaci
      pres tu bezici => viditelne skubani pri prepinani zalozek.
      align-items:flex-start — zabranuje NATAHOVANI jednotlivych panelu na
@@ -2853,6 +2863,13 @@ function selectDay(dateStr){
     const detailEl = document.getElementById('dayDetail');
     if(detailEl) detailEl.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
   });
+  // Když je pro ten den jen JEDEN zápas, nemá smysl nutit ještě druhé
+  // klepnutí na kartu v seznamu — appka ho rovnou otevře v detailu.
+  // Při víc zápasech necháváme seznam, ať si člověk vybere ten svůj.
+  const dayMatches = calendarMatches().filter(m=>m.date_key===dateStr);
+  if(dayMatches.length === 1){
+    setTimeout(()=> openModal(dayMatches[0].id), prefersReducedMotion() ? 0 : 260);
+  }
 }
 function renderDayDetail(dateStr){
   const dayMatches = calendarMatches().filter(m=>m.date_key===dateStr);
