@@ -1286,8 +1286,8 @@ function captureClosingOdds(){
   let changed = false;
   bets.forEach(b=>{
     if(b.closing_odds != null) return;
-    const match = MATCHES.find(m=>m.id===b.matchId);
-    if(!match) return; // zápas už zmizel z DB (uklizen po odehrání) — closing zůstane neznámý
+    const match = MATCHES.find(m=>m.id===b.matchId) || ARCHIVED_MATCHES.find(m=>m.id===b.matchId);
+    if(!match) return; // zápas fakt nikde není (starší než 60denní archiv) — closing zůstane neznámý
     if(new Date(match.start_time).getTime() > Date.now()) return; // ještě nekoplo se
     const bookOdds = match.bookmaker_odds && match.bookmaker_odds[b.book];
     const current = bookOdds ? bookOdds[b.outcome] : null;
@@ -3008,7 +3008,12 @@ window.switchModalTab = function(tab){
   document.querySelectorAll('.modal-tab-panel').forEach(p=>{ p.style.display = p.dataset.mpanel===tab ? '' : 'none'; });
 };
 function openModalInner(id){
-  const m = MATCHES.find(x=>x.id===id);
+  // Hledáme v obou zdrojích — kalendář (calendarMatches()) nabízí zápasy
+  // i z ARCHIVED_MATCHES, takže pokud by se modal díval jen do MATCHES,
+  // u archivovaného zápasu by tiše selhalo `if(!m) return` a klik by
+  // navenek nedělal vůbec nic (přesně tenhle bug bránil auto-otevření
+  // jednozápasového dne v kalendáři).
+  const m = MATCHES.find(x=>x.id===id) || ARCHIVED_MATCHES.find(x=>x.id===id);
   if(!m) return;
   const meta = SPORT_META[m.sport];
   const outcomes = m.hasDraw ? ['home','draw','away'] : ['home','away'];
@@ -3296,7 +3301,11 @@ document.getElementById('modalOverlay').addEventListener('click', e=>{
 });
 
 async function placeBet(matchId){
-  const m = MATCHES.find(x=>x.id===matchId);
+  // Stejný důvod jako u openModalInner — modal teď může patřit zápasu
+  // z ARCHIVED_MATCHES, takže bez tohohle by "Vsadit" tvrdě spadlo na
+  // nedefinovaném zápase místo aby jen bezpečně nic neudělalo.
+  const m = MATCHES.find(x=>x.id===matchId) || ARCHIVED_MATCHES.find(x=>x.id===matchId);
+  if(!m){ showToast('Tenhle zápas appka teď nemá k dispozici — zkus to prosím znovu.', 'error'); return; }
   const outcome = document.getElementById('betOutcome').value;
   const book = document.getElementById('betBook').value;
   const stake = Math.max(10, Math.round(Number(document.getElementById('betStake').value)||0));
