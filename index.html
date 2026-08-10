@@ -28,6 +28,13 @@
   --football:#63d6a0; --hockey:#6cc6ff; --basketball:#ff9e6b; --tennis:#ffd64f; --arb:#b9a7ff;
   --radius:20px;
   --ease:cubic-bezier(.22,.61,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  --fill-ease:cubic-bezier(.16,1,.3,1);
+  /* Pojmenované délky přechodů — dřív měla appka přes 20 mírně odlišných
+     hodnot (0.2s/0.25s/0.3s/0.32s/0.35s/0.36s/0.38s...) pro v podstatě
+     stejné interakce, což působilo nesourodě. Tyhle tři pokrývají naprostou
+     většinu potřeb: rychlá odezva na dotek/klik, běžný hover/otevření,
+     pomalejší efekt tam, kde má být pohyb vidět (pruhy, karty). */
+  --t-fast:.15s; --t-base:.28s; --t-slow:.5s;
 }
 /* --- Vzhled: alternativní témata (výchozí = Ember, beze změny) --- */
 html[data-theme="classic"]{
@@ -294,7 +301,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .hero-tip .teams{font-size:24px; font-weight:800; margin-bottom:6px; letter-spacing:-.3px; position:relative;}
 .hero-tip .meta{font-size:12.5px; color:var(--text-2); margin-bottom:16px; position:relative;}
 .prob-bar{display:flex; height:10px; border-radius:99px; overflow:hidden; background:var(--surface-2); margin-bottom:8px; position:relative; box-shadow:0 0 16px rgba(255,190,114,.15);}
-.prob-bar span{height:100%; transition:width .8s cubic-bezier(.16,1,.3,1);}
+.prob-bar span{height:100%; transition:width .7s var(--fill-ease);}
 .prob-legend{display:flex; justify-content:space-between; font-size:11px; color:var(--text-2); font-family:'JetBrains Mono',monospace; position:relative;}
 
 /* section label */
@@ -306,7 +313,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .pill{
   flex:0 0 auto; padding:8px 15px; border-radius:99px; font-size:12.5px; font-weight:600;
   background:var(--surface); border:1px solid var(--stroke); color:var(--text-2);
-  transition:all .25s var(--ease); white-space:nowrap;
+  transition:background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); white-space:nowrap;
 }
 .pill.active{color:#100b07; background:var(--pill-color,var(--gold)); border-color:transparent;}
 .logout-short{display:none;}
@@ -390,7 +397,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 /* modal */
 .modal-overlay{
   position:fixed; inset:0; z-index:100; background:rgba(8,6,3,.7); backdrop-filter:blur(6px);
-  display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s var(--ease);
+  display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none;
 }
 @media(min-width:700px){ .modal-overlay{align-items:center;} }
 .modal-overlay.open{opacity:1; pointer-events:auto;}
@@ -444,11 +451,11 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .analysis-card{background:var(--surface); border:1px solid var(--stroke); border-radius:var(--radius); padding:18px; margin-bottom:16px;}
 .analysis-card h3{font-size:14.5px; font-weight:700; margin-bottom:12px;}
 .mc-bar{height:10px; border-radius:99px; background:var(--surface-2); overflow:hidden; margin:10px 0;}
-.mc-bar span{display:block; height:100%; background:linear-gradient(90deg,var(--emerald),var(--gold)); transition:width .7s var(--ease);}
+.mc-bar span{display:block; height:100%; background:linear-gradient(90deg,var(--emerald),var(--gold)); transition:width .7s var(--fill-ease);}
 .factor-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--stroke); font-size:12.5px;}
 .factor-row:first-child{border-top:none;}
 .mini-bar{width:100px; height:6px; border-radius:99px; background:var(--surface-2); overflow:hidden;}
-.mini-bar span{display:block; height:100%; background:var(--gold); transition:width .6s var(--ease);}
+.mini-bar span{display:block; height:100%; background:var(--gold); transition:width .7s var(--fill-ease);}
 .steam-badge{font-size:10px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(255,138,111,.15); color:var(--red);}
 
 /* radar */
@@ -489,7 +496,8 @@ svg.pnl-chart{width:100%; height:140px;}
 .cal-dow{text-align:center; font-size:10.5px; color:var(--text-3); font-weight:700; padding-bottom:6px; text-transform:uppercase;}
 .cal-cell{
   aspect-ratio:1/1; border-radius:12px; background:transparent; border:1px solid var(--stroke);
-  padding:6px; display:flex; flex-direction:column; justify-content:space-between; position:relative; transition:all .25s;
+  padding:6px; display:flex; flex-direction:column; justify-content:space-between; position:relative;
+  transition:border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 .cal-cell:hover{border-color:var(--stroke-2); transform:translateY(-2px); background:var(--surface);}
 .cal-cell.muted{opacity:.28;}
@@ -714,10 +722,13 @@ button:active, .cat-tile:active, .card:active, .pill:active{
 .cat-tile:hover{ transform:translateY(-6px) scale(1.015); }
 .kpi:hover{ transform:translateY(-4px) scale(1.01); }
 
-/* modal: soften the entrance with a touch of scale alongside the slide-up */
+/* modal: soften the entrance with a touch of scale alongside the slide-up.
+   Přechod opacity pro .modal-overlay je JEDINÝ zdroj pravdy — dřív byl
+   nastavený i výš (0.3s) a tady se tiše přepisoval na 0.32s, což je
+   přesně ten typ rozdrobeného kódu, co pak působí nesourodě. */
 .modal{ transform:translateY(30px) scale(.98); }
 .modal-overlay.open .modal{ transform:translateY(0) scale(1); }
-.modal-overlay{ transition:opacity .32s var(--ease); }
+.modal-overlay{ transition:opacity var(--t-base) var(--ease); }
 
 /* focus states for keyboard users — subtle, on-brand */
 button:focus-visible, input:focus-visible{
