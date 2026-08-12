@@ -201,7 +201,15 @@ header{
 
 /* pager */
 .pager{
-  flex:0 0 auto; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory;
+  flex:0 0 auto; display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x proximity;
+  /* scroll-snap-type:x PROXIMITY, ne mandatory — mandatory je agresivní:
+     jakmile prst pustíš, i uprostřed drobného, jinak neúmyslného posunu,
+     prohlížeč VŽDY doskočí na nejbližší záložku, klidně sousední. Přesně
+     tohle je "swipe je hodně citlivej, lehce se objevíš, kde nemáš."
+     proximity se přichytí jen když jsi už blízko cílové pozici — malé,
+     nechtěné posuny se prostě vrátí tam, kde jsi byl. Klik na záložku
+     (smoothScrollPagerTo) na konci vždy explicitně dosedne přesně na
+     cíl, takže s programovou navigací to nijak nekoliduje. */
   -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
   transition:height .32s var(--ease);
   touch-action:pan-y;
@@ -840,9 +848,13 @@ button, .seg-btn, a{
    "unesl" do vedlejší záložky. pan-y zachovává okamžitou odezvu na klepnutí
    (žádná 300ms prodleva, žádný double-tap zoom), jen navíc garantuje, že
    vertikální scroll vždycky vyhraje — i když prst začne přesně na kartě. */
-.card, .cat-tile, .kpi, .pill, .cal-cell, .lb-row, .feed-row{
+.card, .cat-tile, .kpi, .pill, .cal-cell, .lb-row, .feed-row, .pill-row{
   touch-action:pan-y;
 }
+/* .pill-row má jen 5 položek (sporty + arbitráž/vše) — i na malém displeji
+   se buď vejdou celé, nebo přetéká jen málo. Riziko "nedosáhnu na skrytý
+   filtr" je tu mnohem menší než přínos spolehlivého vertikálního scrollu,
+   na rozdíl od dřívější obavy, kdy jsme to z opatrnosti nechali být. */
 .card:active, .cat-tile:active, .kpi:active{
   transform:scale(.985);
   transition-duration:.09s;
@@ -2043,6 +2055,7 @@ function renderOverview(){
 function selectCategory(key){
   state.category = key;
   renderOverview();
+  requestAnimationFrame(()=>{ if(typeof syncPagerHeight==='function') syncPagerHeight(); });
 }
 function backToOverview(){
   state.category = null;
@@ -2147,7 +2160,7 @@ function renderValue(){
     </div>
   `;
 }
-function setValueFilter(f){ state.valueFilter=f; renderValue(); }
+function setValueFilter(f){ state.valueFilter=f; renderValue(); requestAnimationFrame(()=>{ if(typeof syncPagerHeight==='function') syncPagerHeight(); }); }
 function setValueSearch(v){
   state.valueSearch = v;
   // debounce lehce, ať nepřekresluje input pod prsty při psaní
