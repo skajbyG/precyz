@@ -401,6 +401,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .round-card-pick{font-size:12.5px; color:var(--text-2); margin-bottom:4px;}
 .round-card-star{font-size:12px; color:var(--gold); font-weight:600; margin-bottom:4px;}
 .round-card-note{font-size:11.5px; color:var(--text-3); line-height:1.5;}
+.round-card-extra{font-size:11.5px; color:var(--text-2); margin-top:4px;}
 .odds-cell{
   flex:1; text-align:center; background:var(--surface-2); border-radius:10px; padding:8px 4px;
   font-family:'JetBrains Mono',monospace;
@@ -2770,6 +2771,22 @@ function renderRound(){
       const topLabel = topOutcome==='home' ? m.home_team : topOutcome==='draw' ? 'Remíza' : m.away_team;
       const meta = SPORT_META[m.sport] || {emoji:'⚽', color:'var(--gold)'};
       const derby = isDerby(m.home_team, m.away_team);
+      // Kolo dřív ukazovalo jen tip na výsledek (1X2) — to samé, co appka
+      // nabízí i jinde, takže ztrácelo smysl jako "přehled celého kola".
+      // Když appka pro zápas MÁ i Over/Under nebo BTTS, přidá je sem jako
+      // druhý řádek. Rohy a karty appka technicky umí zobrazit (viz detail
+      // zápasu), ale reálná data na ně se nikde spolehlivě nedají sehnat —
+      // ani na Flashscore, ani přes API — takže je tu úmyslně nenabízíme;
+      // ukazovat prázdné/vymyšlené hodnoty by bylo přesně to znevěrohodnění,
+      // kterému se appka celou dobu snaží vyhnout.
+      const extraMarkets = [];
+      if(m.over_under){
+        extraMarkets.push(`⚽ O/U ${m.over_under.line}: ${(m.over_under.over*100).toFixed(0)}%/${(m.over_under.under*100).toFixed(0)}%`);
+      }
+      if(m.btts){
+        extraMarkets.push(`🥅 Obě dají gól: ${(m.btts.yes*100).toFixed(0)}%`);
+      }
+      const extraMarketsHtml = extraMarkets.length ? `<div class="round-card-extra">${extraMarkets.join(' · ')}</div>` : '';
       return `
         <div class="round-card" onclick="openModal('${m.id}')" style="--accent:${meta.color}">
           <div class="round-card-top">
@@ -2778,6 +2795,7 @@ function renderRound(){
           </div>
           <div class="round-card-teams">${derby?'🔥 ':''}${m.home_team} <span class="vs">–</span> ${m.away_team}</div>
           <div class="round-card-pick">👉 <b style="color:var(--emerald);">${topLabel}</b> <span class="mono" style="color:var(--text-3);">(${(topP*100).toFixed(0)} %)</span>${m._tier && m._tier!=='skip' && m._tier!=='research' ? ` · <span style="color:var(--text-3);">${fmtPct(m._best.ev)} EV</span>` : ''}</div>
+          ${extraMarketsHtml}
           ${m.top_pick ? `<div class="round-card-star">⭐ ${m.top_pick.label}</div>` : ''}
           ${m.research_key_point ? `<div class="round-card-note">${m.research_key_point}</div>` : ''}
         </div>
