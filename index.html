@@ -455,7 +455,16 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 }
 .bet-form select:focus, .bet-form input:focus{ outline:none; border-color:var(--gold); }
 .stake-input-wrap{ position:relative; }
-.stake-input-wrap input{ padding-right:38px; }
+/* Vlastní limit na sázku neměl žádné pozadí ani border — jen padding pro
+   suffix "Kč". Bez vlastního stylu se input řídil výchozím vzhledem
+   prohlížeče, ne tmavým vzhledem appky, takže vedle ostatních prvků
+   (tlačítka, ostatní pole) vypadal cize a málo viditelně. */
+.stake-input-wrap input{
+  width:100%; background:var(--surface-2); border:1px solid var(--stroke); color:var(--text);
+  border-radius:10px; padding:10px 38px 10px 12px; font-size:16px; font-family:inherit;
+}
+.stake-input-wrap input:focus{ outline:none; border-color:var(--gold); }
+.stake-input-wrap input::placeholder{ color:var(--text-3); }
 .stake-input-wrap .suffix{ position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--text-3); font-weight:600; pointer-events:none; }
 .btn-primary{
   width:100%; padding:12px; border-radius:12px; background:linear-gradient(135deg,var(--gold),var(--teal));
@@ -2483,7 +2492,7 @@ function renderSettings(){
 
     <div class="section-lbl">💶 Sázkové preference</div>
     <div class="note-box" style="margin-bottom:20px;">
-      <div style="margin-bottom:14px;">
+      <div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--stroke);">
         <b style="color:var(--text); font-size:12.5px;">Výchozí sázkovka</b>
         <p class="subtle" style="margin:2px 0 8px;">Předvyplní se v kartě „Vsadit tip" — pořád jde ručně přepnout.</p>
         <div class="group-toggle" style="margin-bottom:0;">
