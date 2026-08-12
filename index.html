@@ -190,6 +190,14 @@ header{
   background:#D55E00; color:#fff; font-size:10px; font-weight:700;
   border-radius:8px; vertical-align:middle;
 }
+/* Záložka "Můj profil" má dvě varianty popisku (plný/zkrácený) — přepínání
+   mezi nimi bylo definované JEN uvnitř mobilního media query (max-width:600px),
+   bez výchozího stavu mimo něj. Bez explicitního výchozího pravidla se oba
+   <span>y chovaly jako obyčejný inline text a zobrazily se VEDLE SEBE —
+   "Můj profilProfil". Tohle dává jasný výchozí stav (plný popisek), který
+   mobilní media query dál správně přepíná na zkrácený. */
+.seg-label-full{display:inline;}
+.seg-label-short{display:none;}
 
 /* pager */
 .pager{
