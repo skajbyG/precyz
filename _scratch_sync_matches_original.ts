@@ -1,4 +1,4 @@
-recyz — sync-matches Edge Function (bez knihovny — čisté REST volání,
+// Precyz — sync-matches Edge Function (bez knihovny — čisté REST volání,
 // aby appka nezávisela na dostupnosti balíčkových registrů esm.sh/jsr).
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -28,15 +28,51 @@ function devig(oddsMap: Record<string, number>): Record<string, number> {
   return out;
 }
 
+// Over/Under: appka pro 1X2 čeká Tipsport/Fortuna/Betano, ale ty pro
+// "totals" trh The Odds API skoro nikdy nemá — vrací hlavně mezinárodní
+// knihy (Pinnacle, Bet365, Unibet...). Místo abychom O/U nechali úplně
+// prázdné, spočítáme ho jako průměr přes VŠECHNY dostupné sázkovky na
+// lince nejblíž 2.5, normalizovaný na pravděpodobnost (marže pryč).
+// Appka u tohohle trhu musí v UI jasně ukázat "mezinárodní odhad", ne
+// tvářit se, že je to konkrétní kurz z CZ sázkovky.
+function extractOverUnder(bookmakers: any[]): { line: number; over: number; under: number; sources: number } | null {
+  let bestPoint: number | null = null, overSum = 0, underSum = 0, count = 0;
+  for (const bm of bookmakers || []) {
+    const totals = (bm.markets || []).find((m: any) => m.key === "totals");
+    if (!totals) continue;
+    const points: number[] = [...new Set(totals.outcomes.map((o: any) => o.point))] as number[];
+    if (!points.length) continue;
+    const closest = points.reduce((a, b) => (Math.abs(b - 2.5) < Math.abs(a - 2.5) ? b : a), points[0]);
+    if (bestPoint === null) bestPoint = closest;
+    if (closest !== bestPoint) continue;
+    const over = totals.outcomes.find((o: any) => o.name === "Over" && o.point === closest);
+    const under = totals.outcomes.find((o: any) => o.name === "Under" && o.point === closest);
+    if (!over || !under) continue;
+    overSum += 1 / over.price; underSum += 1 / under.price; count++;
+  }
+  if (count < 3 || bestPoint === null) return null; // málo zdrojů = radši nic než nedůvěryhodné číslo
+  const sum = overSum + underSum;
+  return { line: bestPoint, over: +(overSum / sum).toFixed(4), under: +(underSum / sum).toFixed(4), sources: count };
+}
+
 async function fetchRealBatch() {
   const rows: any[] = [];
   for (const sportDef of ODDS_API_SPORTS) {
     try {
       const url = `https://api.the-odds-api.com/v4/sports/${sportDef.key}/odds/` +
         `?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`;
-      const res = await fetch(url);
+      const totalsUrl = `https://api.the-odds-api.com/v4/sports/${sportDef.key}/odds/` +
+        `?apiKey=${ODDS_API_KEY}&regions=eu&markets=totals&oddsFormat=decimal`;
+      const [res, totalsRes] = await Promise.all([fetch(url), fetch(totalsUrl)]);
       if (!res.ok) { console.log(`Odds API chyba pro ${sportDef.key}: ${res.status}`); continue; }
       const events = await res.json();
+      const totalsById: Record<string, any[]> = {};
+      if (totalsRes.ok) {
+        try {
+          const totalsEvents = await totalsRes.json();
+          for (const tev of totalsEvents) totalsById[tev.id] = tev.bookmakers || [];
+        } catch (_te) { /* O/U je bonus — když selže parsování, jedeme dál bez něj */ }
+      }
       for (const ev of events) {
         if (!ev.bookmakers || !ev.bookmakers.length) continue;
         const hasDraw = true;
@@ -63,7 +99,12 @@ async function fetchRealBatch() {
         for (const est of allFairEstimates) { avgFair.home += est.home||0; avgFair.draw += est.draw||0; avgFair.away += est.away||0; }
         avgFair.home /= allFairEstimates.length; avgFair.draw /= allFairEstimates.length; avgFair.away /= allFairEstimates.length;
         const confidence = Math.min(85, 35 + allFairEstimates.length * 4);
-        if (Object.keys(bookmakerOdds).length) { rows.push({ id: "api-" + ev.id, sport: "football", country: sportDef.country, match_group: "liga", league: sportDef.league, home_team: ev.home_team, away_team: ev.away_team, start_time: ev.commence_time, bookmaker_odds: bookmakerOdds, our_probabilities: avgFair, confidence_score: confidence, has_draw: hasDraw, live: false, source: "real-api" }); }
+        if (Object.keys(bookmakerOdds).length) {
+          const row: Record<string, unknown> = { id: "api-" + ev.id, sport: "football", country: sportDef.country, match_group: "liga", league: sportDef.league, home_team: ev.home_team, away_team: ev.away_team, start_time: ev.commence_time, bookmaker_odds: bookmakerOdds, our_probabilities: avgFair, confidence_score: confidence, has_draw: hasDraw, live: false, source: "real-api" };
+          const ou = extractOverUnder(totalsById[ev.id]);
+          if (ou) row.over_under = ou;
+          rows.push(row);
+        }
       }
     } catch (e) { console.log(`Chyba: ${String(e)}`); }
   }
