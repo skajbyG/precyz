@@ -1608,7 +1608,9 @@ function mapDbRowToMatch(row){
     research_fears: row.research_fears || null,
     research_confidence: row.research_confidence || null,
     research_key_point: row.research_key_point || null,
-    top_pick: row.top_pick || null
+    top_pick: row.top_pick || null,
+    actual_result: row.actual_result || null,
+    prediction_hit: row.prediction_hit === null || row.prediction_hit === undefined ? null : !!row.prediction_hit
   };
 }
 
@@ -2613,6 +2615,28 @@ function renderMyBets(){
 
     <div class="section-lbl">Kumulativní zisk</div>
     <div class="analysis-card">${pnlChartSvg()}</div>
+
+    <div class="section-lbl">🎯 Výkonnost appky</div>
+    ${(() => {
+      // Tohle NENÍ tvoje historie sázek — appka tady sleduje SAMA SEBE:
+      // trefila svůj vlastní tip (nejvyšší pravděpodobnost z our_probabilities),
+      // bez ohledu na to, jestli jsi na něj vsadil. Plní se automaticky,
+      // jakmile appka po skončení zápasu zjistí skutečný výsledek.
+      const evaluated = ARCHIVED_MATCHES.filter(m => m.prediction_hit !== null && m.prediction_hit !== undefined);
+      if (!evaluated.length) {
+        return `<div class="empty-state" style="margin-bottom:20px;">
+          <div class="big">🎯</div>
+          <div class="t">Zatím žádná vyhodnocená předpověď</div>
+          Appka si tohle začne zaznamenávat automaticky, jakmile bude mít přístup ke skutečným výsledkům zápasů.
+        </div>`;
+      }
+      const hits = evaluated.filter(m => m.prediction_hit).length;
+      const appHitRate = Math.round((hits / evaluated.length) * 100);
+      return `<div class="perf-grid" style="margin-bottom:20px;">
+        <div class="kpi"><div class="val mono">${appHitRate}%</div><div class="lbl">Appka trefila tip</div></div>
+        <div class="kpi"><div class="val mono">${hits}/${evaluated.length}</div><div class="lbl">Vyhodnocených předpovědí</div></div>
+      </div>`;
+    })()}
 
     <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Historie sázek</span>
