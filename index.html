@@ -3668,25 +3668,14 @@ pagerEl.addEventListener('scroll', ()=>{
   }, 80);
 });
 
-/* subtle parallax: panels ease back in scale/opacity the further they sit from center */
 const panelEls = Array.from(pagerEl.querySelectorAll('.panel'));
-let parallaxRaf = null;
-function applyParallax(){
-  const w = pagerEl.clientWidth || 1;
-  const center = pagerEl.scrollLeft + w/2;
-  panelEls.forEach(p=>{
-    const pCenter = p.offsetLeft + w/2;
-    const dist = Math.min(1, Math.abs(pCenter - center)/w);
-    p.style.transform = `scale(${1 - dist*0.04})`;
-    p.style.opacity = String(1 - dist*0.5);
-  });
-  parallaxRaf = null;
-}
-pagerEl.addEventListener('scroll', ()=>{
-  if(parallaxRaf) return;
-  parallaxRaf = requestAnimationFrame(applyParallax);
-}, {passive:true});
-requestAnimationFrame(applyParallax);
+/* Tady dřív byl jemný "parallax" efekt (panely mimo střed se lehce
+   zmenšily a ztlumily) — na KAŽDÝ snímek scrollu ale četl offsetLeft
+   a zapisoval transform/opacity na VŠECH 8 panelech najednou. Čtení
+   layoutové vlastnosti hned po zápisu stylu je klasický layout-thrashing
+   vzorec — nutil prohlížeč přepočítat layout až 8× za snímek, přesně
+   během swipe gesta. Byl to čistě kosmetický bonus, ne funkce — cena
+   (znatelné sekání při swipu) násobně převyšovala přínos, takže je pryč. */
 
 /* auto-fade: whenever any panel's innerHTML is replaced by a render function, gently fade the
    new content in — covers every render*() call site without editing each one individually.
@@ -3734,7 +3723,6 @@ function repositionPagerNow(){
   pagerEl.style.scrollBehavior = 'auto';
   pagerEl.scrollLeft = panelTarget(state.tab);
   positionThumb(state.tab);
-  applyParallax();
 }
 const pagerResizeObserver = new ResizeObserver(()=>{
   repositionPagerNow();
