@@ -1608,9 +1608,7 @@ function mapDbRowToMatch(row){
     research_fears: row.research_fears || null,
     research_confidence: row.research_confidence || null,
     research_key_point: row.research_key_point || null,
-    top_pick: row.top_pick || null,
-    actual_result: row.actual_result || null,
-    prediction_hit: row.prediction_hit === null || row.prediction_hit === undefined ? null : !!row.prediction_hit
+    top_pick: row.top_pick || null
   };
 }
 
@@ -1967,7 +1965,7 @@ function matchCardHtml(m){
     </div>
     <div class="odds-row">${oddsHtml}</div>
     <div class="card-freshness">🎯 Zelený kurz = na co bychom vsadili</div>
-    ${freshness ? `<div class="card-freshness">🕐 data aktualizována: ${freshness}</div>` : ''}
+    ${freshness ? `<div class="card-freshness">🕐 data aktualizována: ${freshness.replace(/^Kurzy: /, '')}</div>` : ''}
   </div>`;
 }
 
@@ -2147,7 +2145,7 @@ function renderValue(){
     ${researchCount>0 ? `<div class="note-box" style="margin-bottom:16px; border-color:rgba(185,167,255,.35);"><span style="color:var(--arb);">🔍 ${researchCount} ${researchCount===1?'zápas má':'zápasů má'} appka jen jako výzkumný odhad</span> — appka na ně nemá reálný kurz, takže "value" nejde poctivě spočítat. Najdeš je v záložce <b style="color:var(--text);">Kolo</b> nebo přímo v Přehledu.</div>` : ''}
     <div class="pill-row">
       <button class="pill ${state.valueFilter==='all'?'active':''}" onclick="setValueFilter('all')">Vše (${valueOnes.length})</button>
-      ${Object.entries(SPORT_META).filter(([k])=>k!=='arbitrage').map(([k,mm])=>`
+      ${Object.entries(SPORT_META).filter(([k])=>k!=='arbitrage' && ((bySport[k]||0)>0 || state.valueFilter===k)).map(([k,mm])=>`
         <button class="pill ${state.valueFilter===k?'active':''}" style="--pill-color:${mm.color}" onclick="setValueFilter('${k}')">${mm.emoji} ${mm.label} (${bySport[k]||0})</button>
       `).join('')}
     </div>
@@ -2298,24 +2296,18 @@ async function fillAccuracyStatBox(){
 /* ============================= PANEL 3: RADAR ============================= */
 function renderRadar(){
   const el = document.getElementById('panel-3');
-  const sharpCompared = MATCHES.length;
   const sharpValue = MATCHES.filter(m=>m._tier!=='skip' && m._tier!=='research');
   const researchCount = MATCHES.filter(m=>m._tier==='research').length;
 
   el.innerHTML = `
     <h1 class="title">Radar příležitostí</h1>
-    <p class="subtle">Appka tady ukazuje jen to, co umí skutečně spočítat — žádné předstírané metody.</p>
+    <p class="subtle">Appka tady ukazuje jen to, co umí skutečně spočítat — žádné předstírané metody. Hledáš konkrétní value tipy? Ty jsou přehledně ve <a href="#" onclick="setActiveTab(1); return false;" style="color:var(--gold); text-decoration:underline;">Value sázkách</a> — Radar je spíš úplný přehled toho, co appka vůbec sleduje.</p>
 
-    <div class="radar-block">
-      <div class="radar-head" style="color:var(--emerald)">📐 Skutečná value (proti reálným kurzům)</div>
-      <p class="subtle" style="margin-bottom:12px;">${sharpCompared} zápasů ve skenu, z toho appka umí spočítat matematickou výhodu jen tam, kde má reálný kurz od skutečné kurzové kanceláře.</p>
-      ${sharpValue.length ? `<div class="match-grid">${sharpValue.slice(0,6).map(safeMatchCardHtml).join('')}</div>` :
-      `<div class="empty-state"><div class="big">🛡️</div><div class="t">${researchCount>0 ? `Appka teď nesleduje žádnou ligu s reálnými kurzy (${researchCount} ${researchCount===1?'zápas má':'zápasů má'} jen výzkumný odhad)` : 'Žádná value se dnes neobjevila'}</div>Appka si radši nevymýšlí value tam, kde ji nemá jak ověřit.</div>`}
-    </div>
+    <div class="warn-box">⚠️ Appka nemá vlastní ELO model ani nezávislé srovnání proti "ostrým" knihám (Pinnacle/Betfair) — dřív appka tuhle sekci takhle popisovala, ale ve skutečnosti to nedělala. Value se počítá jen tam, kde appka má reálný kurz uložený u zápasu (viz "Zdroj: real-api" v detailu).</div>
 
-    <div class="warn-box">⚠️ Appka nemá vlastní ELO model ani nezávislé srovnání proti "ostrým" knihám (Pinnacle/Betfair) — dřív appka tuhle sekci takhle popisovala, ale ve skutečnosti to nedělala. Value výš je spočítaná jen tam, kde appka má reálný kurz uložený u zápasu (viz "Zdroj: real-api" v detailu).</div>
+    ${!sharpValue.length ? `<div class="empty-state" style="margin-top:16px;"><div class="big">🛡️</div><div class="t">${researchCount>0 ? `Appka teď nesleduje žádnou ligu s reálnými kurzy (${researchCount} ${researchCount===1?'zápas má':'zápasů má'} jen výzkumný odhad)` : 'Žádná value se dnes neobjevila'}</div>Appka si radši nevymýšlí value tam, kde ji nemá jak ověřit.</div>` : ''}
 
-    <div class="section-lbl">Ve skenu · ${MATCHES.length} zápasů</div>
+    <div class="section-lbl">Ve skenu · ${MATCHES.length} zápasů (${sharpValue.length} s reálným kurzem, ${researchCount} jen výzkumných)</div>
     <div class="match-grid">${MATCHES.map(safeMatchCardHtml).join('')}</div>
   `;
 }
@@ -2615,28 +2607,6 @@ function renderMyBets(){
 
     <div class="section-lbl">Kumulativní zisk</div>
     <div class="analysis-card">${pnlChartSvg()}</div>
-
-    <div class="section-lbl">🎯 Výkonnost appky</div>
-    ${(() => {
-      // Tohle NENÍ tvoje historie sázek — appka tady sleduje SAMA SEBE:
-      // trefila svůj vlastní tip (nejvyšší pravděpodobnost z our_probabilities),
-      // bez ohledu na to, jestli jsi na něj vsadil. Plní se automaticky,
-      // jakmile appka po skončení zápasu zjistí skutečný výsledek.
-      const evaluated = ARCHIVED_MATCHES.filter(m => m.prediction_hit !== null && m.prediction_hit !== undefined);
-      if (!evaluated.length) {
-        return `<div class="empty-state" style="margin-bottom:20px;">
-          <div class="big">🎯</div>
-          <div class="t">Zatím žádná vyhodnocená předpověď</div>
-          Appka si tohle začne zaznamenávat automaticky, jakmile bude mít přístup ke skutečným výsledkům zápasů.
-        </div>`;
-      }
-      const hits = evaluated.filter(m => m.prediction_hit).length;
-      const appHitRate = Math.round((hits / evaluated.length) * 100);
-      return `<div class="perf-grid" style="margin-bottom:20px;">
-        <div class="kpi"><div class="val mono">${appHitRate}%</div><div class="lbl">Appka trefila tip</div></div>
-        <div class="kpi"><div class="val mono">${hits}/${evaluated.length}</div><div class="lbl">Vyhodnocených předpovědí</div></div>
-      </div>`;
-    })()}
 
     <div class="section-lbl" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Historie sázek</span>
@@ -3871,6 +3841,14 @@ function formatAge(diffMin){
   if(diffMin === 1) return 'Kurzy: před 1 min';
   if(diffMin < 60) return `Kurzy: před ${diffMin} min`;
   const h = Math.floor(diffMin/60), mnt = diffMin%60;
+  // Nad 48 hodin appka přepne na dny — "před 194 h 6 min" nikdo neumí
+  // rychle přečíst a navíc to vypadá jako appka je rozbitá, i když jde
+  // jen o starší ručně ověřený zápas, co se dlouho nekontroloval.
+  if(h >= 48){
+    const dny = Math.floor(h/24);
+    const skl = dny===1 ? 'dnem' : dny>=2 && dny<=4 ? 'dny' : 'dny'; // "před 1 dnem", jinak "před X dny"
+    return `Kurzy: před ${dny} ${skl}`;
+  }
   return mnt===0 ? `Kurzy: před ${h} h` : `Kurzy: před ${h} h ${mnt} min`;
 }
 function tickAge(){
