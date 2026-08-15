@@ -954,7 +954,8 @@ button:active, .seg-btn:active{ transform:scale(.96); transition-duration:.08s; 
       <button class="seg-btn" data-i="4" role="tab" aria-selected="false"><span class="seg-icon">📅</span><span class="seg-label">Kalendář</span></button>
       <button class="seg-btn" data-i="5" role="tab" aria-selected="false"><span class="seg-icon">🎲</span><span class="seg-label">Kolo</span></button>
       <button class="seg-btn" data-i="6" role="tab" aria-selected="false"><span class="seg-icon">👤</span><span class="seg-label seg-label-full">Můj profil</span><span class="seg-label seg-label-short">Profil</span><span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
-      <button class="seg-btn" data-i="7" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;"><span class="seg-icon">🛠️</span><span class="seg-label">Admin</span></button>
+      <button class="seg-btn" data-i="7" role="tab" aria-selected="false"><span class="seg-icon">🏆</span><span class="seg-label">Žebříček</span></button>
+      <button class="seg-btn" data-i="8" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;"><span class="seg-icon">🛠️</span><span class="seg-label">Admin</span></button>
     </div>
   </div>
 
@@ -966,6 +967,7 @@ button:active, .seg-btn:active{ transform:scale(.96); transition-duration:.08s; 
     <div class="panel" id="panel-5" role="tabpanel"></div>
     <div class="panel" id="panel-6" role="tabpanel"></div>
     <div class="panel" id="panel-7" role="tabpanel"></div>
+    <div class="panel" id="panel-lb" role="tabpanel"></div>
     <div class="panel" id="panel-9" role="tabpanel"></div>
   </div>
 
@@ -2967,7 +2969,7 @@ function initial(name){ return (name||'?').replace('_',' ').split(' ')[0].slice(
 function setLbPeriod(p){ state.lbPeriod = p; renderLeaderboard(); }
 window.setLbPeriod = setLbPeriod;
 async function renderLeaderboard(){
-  const el = document.getElementById('panel-6');
+  const el = document.getElementById('panel-lb');
   if(!el) return;
   const myEmail = currentProfile ? currentProfile.email : null;
 
@@ -3868,7 +3870,7 @@ setInterval(tickAge, 15000); tickAge();
 
 /* ============================= INIT ============================= */
 function renderAll(){
-  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderCalendar, renderRound, renderProfile, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
+  const steps = [renderOverview, renderValue, renderAnalysis, renderRadar, renderCalendar, renderRound, renderProfile, renderLeaderboard, countUp, updateValueBadge, updateSettleBadge, updateAppMood];
   for(const step of steps){
     try{ step(); }
     catch(e){ console.debug('[Precyz] render step failed, continuing with the rest:', step.name, e && e.message); }
