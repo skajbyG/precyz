@@ -244,9 +244,16 @@ header{
 .pager.is-animating{ scroll-snap-type:none; }
 .pager::-webkit-scrollbar{display:none;}
 .panel{
-  flex:0 0 100%; width:100%; scroll-snap-align:start;
+  flex:0 0 100%; width:100%; min-width:0; scroll-snap-align:start;
   padding:22px 20px 80px; max-width:1300px; margin:0 auto; min-height:40vh;
 }
+/* min-width:0 je tu klíčové — flex položky mají DEFAULTNĚ min-width:auto,
+   což znamená, že se NIKDY nesmrsknou pod přirozenou šířku svého nejširšího
+   obsahu, i když mají flex:0 0 100%. Pokud byl kdekoliv uvnitř panelu prvek
+   o pár pixelů širší (dlouhý text, grid, cokoliv), CELÝ panel se neviditelně
+   roztáhl přes okraj obrazovky a body{overflow-x:hidden} to potichu useklo
+   — přesně to "čtvrt věci vpravo není vidět". Tahle jedna vlastnost donutí
+   panel skutečně respektovat 100% šířku rodiče vždy, bez výjimky. */
 @media(min-width:1000px){ .panel{padding:32px 32px 100px;} }
 
 h1.title{font-size:24px; font-weight:700; letter-spacing:-.3px; margin-bottom:4px;}
