@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#100b07">
+<meta name="theme-color" content="#0d0912">
 <meta name="description" content="Precyz — sázkařská inteligence. Terminál na hledání value sázek napříč Tipsport, Fortuna a Betano.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -19,13 +19,13 @@
 <title>Precyz — Sázkařská inteligence</title>
 <style>
 :root{
-  --bg:#100b07; --bg-elev:#1b130c;
-  --surface:rgba(255,246,236,.042); --surface-2:rgba(255,246,236,.07); --surface-hi:rgba(255,246,236,.10);
-  --stroke:rgba(255,236,216,.09); --stroke-2:rgba(255,236,216,.16);
-  --text:#f7f1e9; --text-2:#b4a89a; --text-3:#6d6256;
-  --emerald:#63d6a0; --gold:#ffbe72; --teal:#ffb066; --red:#ff8a6f;
+  --bg:#0d0912; --bg-elev:#180f22;
+  --surface:rgba(240,230,255,.042); --surface-2:rgba(240,230,255,.07); --surface-hi:rgba(240,230,255,.10);
+  --stroke:rgba(224,204,255,.09); --stroke-2:rgba(224,204,255,.16);
+  --text:#f3eefa; --text-2:#a89ab8; --text-3:#655a75;
+  --emerald:#63d6a0; --gold:#b18aff; --teal:#d4b3ff; --red:#ff6b9d;
   --wallet-blue:#5b9dff; --wallet-yellow:#ffd23f;
-  --football:#63d6a0; --hockey:#6cc6ff; --basketball:#ff9e6b; --tennis:#ffd64f; --arb:#b9a7ff;
+  --football:#63d6a0; --hockey:#6cc6ff; --basketball:#ff8fb3; --tennis:#ffd64f; --arb:#7dd8ff;
   --radius:20px;
   --ease:cubic-bezier(.22,.61,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
   --fill-ease:cubic-bezier(.16,1,.3,1);
@@ -36,7 +36,7 @@
      pomalejší efekt tam, kde má být pohyb vidět (pruhy, karty). */
   --t-fast:.15s; --t-base:.28s; --t-slow:.5s;
 }
-/* --- Vzhled: alternativní témata (výchozí = Ember, beze změny) --- */
+/* --- Vzhled: alternativní témata (výchozí = Ametyst/fialová, beze změny) --- */
 html[data-theme="classic"]{
   --bg:#0e1116; --bg-elev:#171b22;
   --surface:rgba(230,237,243,.042); --surface-2:rgba(230,237,243,.07); --surface-hi:rgba(230,237,243,.11);
@@ -338,7 +338,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
   background:var(--surface); border:1px solid var(--stroke); color:var(--text-2);
   transition:background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); white-space:nowrap;
 }
-.pill.active{color:#100b07; background:var(--pill-color,var(--gold)); border-color:transparent;}
+.pill.active{color:var(--bg); background:var(--pill-color,var(--gold)); border-color:transparent;}
 .logout-short{display:none;}
 .back-btn{display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2); margin-bottom:14px; font-weight:600;}
 .back-btn:hover{color:var(--text);}
@@ -1780,7 +1780,7 @@ function setKellyMode(mode){
 window.setKellyMode = setKellyMode;
 
 /* ---- Vzhled appky ---- */
-const THEME_META = { ember: '🔥 Ember', classic: '🌙 Klasická tmavá', contrast: '⚫ Vysoký kontrast' };
+const THEME_META = { ember: '💜 Ametyst', classic: '🌙 Klasická tmavá', contrast: '⚫ Vysoký kontrast' };
 const DENSITY_META = { comfortable: 'Komfortní', compact: 'Kompaktní' };
 function getTheme(){ try{ return localStorage.getItem('precyz_theme_v1') || 'ember'; }catch(e){ return 'ember'; } }
 function getDensity(){ try{ return localStorage.getItem('precyz_density_v1') || 'comfortable'; }catch(e){ return 'comfortable'; } }
@@ -3520,7 +3520,7 @@ function applySeasonalTheme(){
 }
 
 function fireConfetti(){
-  const colors = ['#ffbe72','#63d6a0','#009E73','#0072B2','#CC79A7'];
+  const colors = ['#b18aff','#63d6a0','#009E73','#0072B2','#CC79A7'];
   const count = 32;
   const container = document.createElement('div');
   container.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:9999; overflow:hidden;';
