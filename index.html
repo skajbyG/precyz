@@ -99,14 +99,14 @@ button{font-family:inherit; cursor:pointer; border:none; background:none; color:
 }
 .mesh .blob{
   width:40vw; height:40vw; top:10vw; left:35vw;
-  background:radial-gradient(circle, rgba(185,167,255,.14), transparent 70%);
+  background:radial-gradient(circle, rgba(125,216,255,.14), transparent 70%);
   animation:drift3 40s ease-in-out infinite;
 }
 @keyframes drift1{0%,100%{transform:translate3d(0,0,0);}50%{transform:translate3d(4vw,3vw,0);}}
 @keyframes drift2{0%,100%{transform:translate3d(0,0,0);}50%{transform:translate3d(-5vw,2vw,0);}}
 @keyframes drift3{0%,100%{transform:translate3d(0,0,0);}50%{transform:translate3d(-3vw,-4vw,0);}}
 .vignette{position:fixed; inset:0; z-index:1; pointer-events:none;
-  background:radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(16,11,7,.6) 100%);}
+  background:radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(13,9,18,.6) 100%);}
 
 .app{position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column;}
 /* header */
@@ -114,7 +114,7 @@ header{
   position:sticky; top:0; z-index:50;
   display:flex; align-items:center; justify-content:space-between;
   padding:calc(14px + env(safe-area-inset-top)) 20px 14px;
-  background:rgba(16,11,7,.78); backdrop-filter:blur(12px);
+  background:rgba(13,9,18,.78); backdrop-filter:blur(12px);
   border-bottom:1px solid var(--stroke);
 }
 .brand{display:flex; align-items:center; gap:10px;}
@@ -152,7 +152,7 @@ header{
 .chat-head{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--stroke); font-weight:700; font-size:14px;}
 .chat-body{flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px;}
 .chat-msg{max-width:82%; padding:8px 11px; border-radius:12px; background:var(--surface); border:1px solid var(--stroke); font-size:13.5px; line-height:1.45; word-break:break-word;}
-.chat-msg.mine{align-self:flex-end; background:rgba(255,190,114,.12); border-color:rgba(255,190,114,.3);}
+.chat-msg.mine{align-self:flex-end; background:rgba(177,138,255,.12); border-color:rgba(177,138,255,.3);}
 .chat-msg .who{font-size:11px; font-weight:700; color:var(--gold); margin-bottom:2px;}
 .chat-msg.mine .who{color:var(--emerald);}
 .chat-msg .when{font-size:10px; color:var(--text-2); margin-top:3px; text-align:right;}
@@ -164,7 +164,7 @@ header{
 }
 
 /* segmented nav */
-.navwrap{position:sticky; top:calc(63px + env(safe-area-inset-top)); z-index:40; padding:12px 20px; background:linear-gradient(180deg, rgba(16,11,7,.85), rgba(16,11,7,.5));backdrop-filter:blur(10px); border-bottom:1px solid var(--stroke);}
+.navwrap{position:sticky; top:calc(63px + env(safe-area-inset-top)); z-index:40; padding:12px 20px; background:linear-gradient(180deg, rgba(13,9,18,.85), rgba(13,9,18,.5));backdrop-filter:blur(10px); border-bottom:1px solid var(--stroke);}
 .segmented{
   position:relative; display:flex; overflow-x:auto; gap:2px;
   background:var(--surface); border:1px solid var(--stroke); border-radius:99px; padding:4px;
@@ -180,6 +180,7 @@ header{
 }
 .seg-btn{
   position:relative; z-index:1; flex:1 0 auto; white-space:nowrap;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
   padding:9px 16px; font-size:13.5px; font-weight:600; color:var(--text-2);
   border-radius:99px; transition:color .25s var(--ease);
 }
@@ -295,7 +296,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 
 /* hero tip card */
 .hero-tip{
-  background:linear-gradient(115deg, rgba(255,190,114,.16), rgba(185,167,255,.08), rgba(255,190,114,.12));
+  background:linear-gradient(115deg, rgba(177,138,255,.16), rgba(125,216,255,.08), rgba(177,138,255,.12));
   /* animace background-position odstranena — prekreslovala celou kartu kazdy
      snimek donekonecna. Zivot karte dodava sviticí prejezd (::before) na GPU. */
   border:1px solid var(--stroke-2); border-radius:24px; padding:26px 24px; margin-bottom:24px;
@@ -323,7 +324,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .hero-tip .eyebrow{font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--gold); font-weight:700; margin-bottom:10px; position:relative;}
 .hero-tip .teams{font-size:24px; font-weight:800; margin-bottom:6px; letter-spacing:-.3px; position:relative;}
 .hero-tip .meta{font-size:12.5px; color:var(--text-2); margin-bottom:16px; position:relative;}
-.prob-bar{display:flex; height:10px; border-radius:99px; overflow:hidden; background:var(--surface-2); margin-bottom:8px; position:relative; box-shadow:0 0 16px rgba(255,190,114,.15);}
+.prob-bar{display:flex; height:10px; border-radius:99px; overflow:hidden; background:var(--surface-2); margin-bottom:8px; position:relative; box-shadow:0 0 16px rgba(177,138,255,.15);}
 .prob-bar span{height:100%; transition:width .7s var(--fill-ease);}
 .prob-legend{display:flex; justify-content:space-between; font-size:11px; color:var(--text-2); font-family:'JetBrains Mono',monospace; position:relative;}
 
@@ -477,7 +478,7 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
   width:100%; padding:12px; border-radius:12px; background:linear-gradient(135deg,var(--gold),var(--teal));
   color:#1a1006; font-weight:700; font-size:14px; transition:transform .2s var(--spring), box-shadow .2s;
 }
-.btn-primary:hover{transform:translateY(-2px); box-shadow:0 8px 20px -6px rgba(255,190,114,.4);}
+.btn-primary:hover{transform:translateY(-2px); box-shadow:0 8px 20px -6px rgba(177,138,255,.4);}
 .btn-primary:disabled{opacity:.4; cursor:not-allowed; transform:none; box-shadow:none;}
 
 /* analysis panel */
@@ -489,12 +490,12 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 .factor-row:first-child{border-top:none;}
 .mini-bar{width:100px; height:6px; border-radius:99px; background:var(--surface-2); overflow:hidden;}
 .mini-bar span{display:block; height:100%; background:var(--gold); transition:width .7s var(--fill-ease);}
-.steam-badge{font-size:10px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(255,138,111,.15); color:var(--red);}
+.steam-badge{font-size:10px; font-weight:700; padding:3px 8px; border-radius:99px; background:rgba(255,107,157,.15); color:var(--red);}
 
 /* radar */
 .radar-block{border-radius:var(--radius); border:1px solid var(--stroke); padding:18px; margin-bottom:16px; background:var(--surface);}
 .radar-head{display:flex; align-items:center; gap:8px; margin-bottom:10px; font-weight:700; font-size:14.5px;}
-.warn-box{background:rgba(255,138,111,.08); border:1px solid rgba(255,138,111,.3); border-radius:12px; padding:10px 12px; font-size:12px; color:var(--red); margin-top:10px;}
+.warn-box{background:rgba(255,107,157,.08); border:1px solid rgba(255,107,157,.3); border-radius:12px; padding:10px 12px; font-size:12px; color:var(--red); margin-top:10px;}
 
 /* my bets */
 .wallets{display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:20px;}
@@ -513,9 +514,9 @@ p.subtle{color:var(--text-2); font-size:13.5px; margin-bottom:20px;}
 @media(min-width:700px){ .perf-grid{grid-template-columns:repeat(4,1fr);} }
 .bet-row{display:flex; align-items:center; justify-content:space-between; padding:11px 14px; background:var(--surface); border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px; font-size:12.5px;}
 .bet-row .st{font-weight:700; padding:3px 9px; border-radius:99px; font-size:10.5px;}
-.st.open{background:rgba(255,190,114,.15); color:var(--gold);}
+.st.open{background:rgba(177,138,255,.15); color:var(--gold);}
 .st.win{background:rgba(99,214,160,.15); color:var(--emerald);}
-.st.lose{background:rgba(255,138,111,.15); color:var(--red);}
+.st.lose{background:rgba(255,107,157,.15); color:var(--red);}
 svg.pnl-chart{width:100%; height:140px;}
 
 /* calendar */
@@ -554,7 +555,7 @@ svg.pnl-chart{width:100%; height:140px;}
   transition:transform .3s var(--ease);
 }
 .podium-card:hover{transform:translateY(-4px);}
-.podium-card.rank1{border-color:rgba(255,190,114,.5); background:rgba(255,190,114,.08); order:2; padding-top:22px;}
+.podium-card.rank1{border-color:rgba(177,138,255,.5); background:rgba(177,138,255,.08); order:2; padding-top:22px;}
 .podium-card.rank2{order:1;}
 .podium-card.rank3{order:3;}
 .podium-medal{font-size:22px; margin-bottom:6px;}
@@ -564,7 +565,7 @@ svg.pnl-chart{width:100%; height:140px;}
   display:flex; align-items:center; gap:12px; padding:11px 14px; background:var(--surface);
   border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px;
 }
-.lb-row.me{border-color:rgba(255,190,114,.5); background:rgba(255,190,114,.06);}
+.lb-row.me{border-color:rgba(177,138,255,.5); background:rgba(177,138,255,.06);}
 .lb-rank{width:22px; font-family:'JetBrains Mono',monospace; color:var(--text-2); font-size:12.5px; font-weight:700;}
 .lb-avatar{
   width:32px; height:32px; border-radius:50%; background:var(--surface-2); display:flex; align-items:center; justify-content:center;
@@ -578,7 +579,7 @@ svg.pnl-chart{width:100%; height:140px;}
   padding:11px 14px; background:var(--surface); border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px; font-size:12.5px;
   display:flex; align-items:center; justify-content:space-between; gap:10px;
 }
-.feed-row.me{border-color:rgba(255,190,114,.4);}
+.feed-row.me{border-color:rgba(177,138,255,.4);}
 .feed-left b{font-size:13px;}
 .feed-left .m{color:var(--text-2); display:block; margin-top:2px;}
 .note-box{
@@ -641,7 +642,7 @@ svg.pnl-chart{width:100%; height:140px;}
 .sort-wrap select:focus{ outline:none; }
 .results-count{ font-size:12px; color:var(--text-3); margin:10px 2px 14px; }
 .auth-error{
-  background:rgba(255,138,111,.1); border:1px solid rgba(255,138,111,.3); color:var(--red);
+  background:rgba(255,107,157,.1); border:1px solid rgba(255,107,157,.3); color:var(--red);
   border-radius:10px; padding:9px 12px; font-size:12px; margin-bottom:12px;
 }
 .auth-switch{text-align:center; margin-top:16px; font-size:12.5px; color:var(--text-2);}
@@ -656,7 +657,7 @@ svg.pnl-chart{width:100%; height:140px;}
 .admin-user-row .actions{display:flex; gap:6px; flex-shrink:0;}
 .btn-small{padding:10px 14px; border-radius:9px; font-size:12.5px; font-weight:700; min-height:38px;}
 .btn-approve{background:rgba(99,214,160,.15); color:var(--emerald);}
-.btn-reject{background:rgba(255,138,111,.15); color:var(--red);}
+.btn-reject{background:rgba(255,107,157,.15); color:var(--red);}
 
 /* toast notifications — replace jarring native alert() with something on-brand */
 .toast-stack{
@@ -673,7 +674,7 @@ svg.pnl-chart{width:100%; height:140px;}
 .toast.leaving{ animation:toastOut .28s var(--ease) forwards; }
 .toast .ic{font-size:16px; flex-shrink:0;}
 .toast.success{ border-color:rgba(99,214,160,.4); }
-.toast.error{ border-color:rgba(255,138,111,.4); }
+.toast.error{ border-color:rgba(255,107,157,.4); }
 @keyframes toastIn{ from{opacity:0; transform:translateY(-14px) scale(.95);} to{opacity:1; transform:translateY(0) scale(1);} }
 @keyframes toastOut{ from{opacity:1; transform:translateY(0) scale(1);} to{opacity:0; transform:translateY(-10px) scale(.96);} }
 
@@ -765,7 +766,7 @@ button:active, .cat-tile:active, .card:active, .pill:active{
 
 /* focus states for keyboard users — subtle, on-brand */
 button:focus-visible, input:focus-visible{
-  outline:2px solid rgba(255,190,114,.55); outline-offset:2px;
+  outline:2px solid rgba(177,138,255,.55); outline-offset:2px;
 }
 
 /* segmented thumb: a touch more spring on release */
@@ -800,7 +801,7 @@ button:focus-visible, input:focus-visible{
   .navwrap{
     position:fixed; top:auto; bottom:0; left:0; right:0; z-index:60;
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-    background:rgba(16,11,7,.92); backdrop-filter:blur(20px) saturate(140%);
+    background:rgba(13,9,18,.92); backdrop-filter:blur(20px) saturate(140%);
     border-bottom:none; border-top:1px solid var(--stroke);
     box-shadow:0 -8px 24px rgba(0,0,0,.35);
   }
@@ -808,7 +809,7 @@ button:focus-visible, input:focus-visible{
   .seg-thumb{border-radius:13px;}
   .seg-btn{
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:2px; flex:0 0 auto; min-width:60px; padding:7px 5px 6px;
+    gap:4px; flex:0 0 auto; min-width:60px; padding:7px 5px 6px;
   }
   .seg-icon{display:block; font-size:18px; line-height:1;}
   .seg-label{display:block; font-size:9px; font-weight:700; white-space:nowrap; letter-spacing:0;}
@@ -1355,16 +1356,16 @@ async function renderSyncStatusBox(){
   try{
     const { data, error } = await supabase.from('system_status').select('*').eq('id','sync-matches').single();
     if(error || !data || !data.last_run_at){
-      return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Automatika zápasů (<span class="mono">sync-matches</span>) ještě nikdy neproběhla. Spusť ji ručně přes „Test" ve Supabase, nebo nastav cron.</div>`;
+      return `<div class="note-box" style="border-color:rgba(255,107,157,.35);">⚠️ Automatika zápasů (<span class="mono">sync-matches</span>) ještě nikdy neproběhla. Spusť ji ručně přes „Test" ve Supabase, nebo nastav cron.</div>`;
     }
     const ageMin = Math.floor((Date.now() - new Date(data.last_run_at).getTime())/60000);
     const stale = ageMin > 570; // cron teď běží každých 8 h — přes 9.5h bez běhu = podezřelé
     const ageTxt = ageMin < 60 ? `${ageMin} min` : `${Math.floor(ageMin/60)} h ${ageMin%60} min`;
     if(!data.last_run_ok){
-      return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Poslední běh automatiky <b>selhal</b> (před ${ageTxt}). Detail: <span class="mono">${(data.last_run_detail&&data.last_run_detail.error)||'neznámá chyba'}</span></div>`;
+      return `<div class="note-box" style="border-color:rgba(255,107,157,.35);">⚠️ Poslední běh automatiky <b>selhal</b> (před ${ageTxt}). Detail: <span class="mono">${(data.last_run_detail&&data.last_run_detail.error)||'neznámá chyba'}</span></div>`;
     }
     if(stale){
-      return `<div class="note-box" style="border-color:rgba(255,138,111,.35);">⚠️ Automatika naposledy proběhla před <b>${ageTxt}</b> — to je déle, než by mělo být. Zkontroluj cron job ve Supabase.</div>`;
+      return `<div class="note-box" style="border-color:rgba(255,107,157,.35);">⚠️ Automatika naposledy proběhla před <b>${ageTxt}</b> — to je déle, než by mělo být. Zkontroluj cron job ve Supabase.</div>`;
     }
     return `<div class="note-box">🟢 Automatika zápasů běží — naposledy proběhla před ${ageTxt} (režim: <span class="mono">${(data.last_run_detail&&data.last_run_detail.mode)||'?'}</span>).</div>`;
   }catch(e){
@@ -2151,7 +2152,7 @@ function renderValue(){
   el.innerHTML = `
     <h1 class="title">Value sázky</h1>
     <p class="subtle">Jen zápasy se skutečným kurzem od reálné kurzové kanceláře, kde appka najde matematickou výhodu (EV ≥ 5 %) — žádná porovnání appky se sebou samou.</p>
-    ${researchCount>0 ? `<div class="note-box" style="margin-bottom:16px; border-color:rgba(185,167,255,.35);"><span style="color:var(--arb);">🔍 ${researchCount} ${researchCount===1?'zápas má':'zápasů má'} appka jen jako výzkumný odhad</span> — appka na ně nemá reálný kurz, takže "value" nejde poctivě spočítat. Najdeš je v záložce <b style="color:var(--text);">Kolo</b> nebo přímo v Přehledu.</div>` : ''}
+    ${researchCount>0 ? `<div class="note-box" style="margin-bottom:16px; border-color:rgba(125,216,255,.35);"><span style="color:var(--arb);">🔍 ${researchCount} ${researchCount===1?'zápas má':'zápasů má'} appka jen jako výzkumný odhad</span> — appka na ně nemá reálný kurz, takže "value" nejde poctivě spočítat. Najdeš je v záložce <b style="color:var(--text);">Kolo</b> nebo přímo v Přehledu.</div>` : ''}
     <div class="pill-row">
       <button class="pill ${state.valueFilter==='all'?'active':''}" onclick="setValueFilter('all')">Vše (${valueOnes.length})</button>
       ${Object.entries(SPORT_META).filter(([k])=>k!=='arbitrage' && ((bySport[k]||0)>0 || state.valueFilter===k)).map(([k,mm])=>`
@@ -3104,7 +3105,7 @@ function openModalInner(id){
   const strength = topP>=0.55 ? 'Jasné' : topP>=0.4 ? 'Mírné' : 'Slabé';
 
   const ouBox = (data, title, emoji, moreExtra) => !data ? '' : `
-      <div class="note-box" style="margin-bottom:16px; ${data.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+      <div class="note-box" style="margin-bottom:16px; ${data.low_confidence ? 'border-color:rgba(177,138,255,.35);' : ''}">
         <b style="color:var(--text);">${emoji} ${title} ${data.line}</b>
         ${data.low_confidence ? `<div style="font-size:11px; color:var(--gold); margin-top:2px;">⚠️ Nízká spolehlivost — málo odehraných dat</div>` : ''}
         <div style="display:flex; gap:8px; margin-top:8px;">
@@ -3122,7 +3123,7 @@ function openModalInner(id){
       </div>`;
 
   const btts = m.btts ? `
-      <div class="note-box" style="margin-bottom:16px; ${m.btts.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+      <div class="note-box" style="margin-bottom:16px; ${m.btts.low_confidence ? 'border-color:rgba(177,138,255,.35);' : ''}">
         <b style="color:var(--text);">🥅 Dají gól oba týmy?</b>
         ${m.btts.low_confidence ? `<div style="font-size:11px; color:var(--gold); margin-top:2px;">⚠️ Nízká spolehlivost — málo odehraných dat</div>` : ''}
         <div style="display:flex; gap:8px; margin-top:8px;">
@@ -3138,7 +3139,7 @@ function openModalInner(id){
       </div>` : '';
 
   const cornersWinner = m.corners_ou ? `
-      <div class="note-box" style="margin-bottom:16px; ${m.corners_ou.low_confidence ? 'border-color:rgba(255,190,114,.35);' : ''}">
+      <div class="note-box" style="margin-bottom:16px; ${m.corners_ou.low_confidence ? 'border-color:rgba(177,138,255,.35);' : ''}">
         <b style="color:var(--text);">🚩 Kdo vyhraje na rohy?</b>
         <div style="display:flex; gap:6px; margin-top:8px;">
           <div style="flex:1; text-align:center; padding:8px; background:var(--surface-2); border-radius:8px;">
@@ -3166,7 +3167,7 @@ function openModalInner(id){
       </div>` : '';
 
   const topPickHtml = m.top_pick ? `
-      <div class="note-box" style="margin-bottom:16px; background:linear-gradient(115deg, rgba(255,190,114,.14), rgba(185,167,255,.06)); border-color:rgba(255,190,114,.4);">
+      <div class="note-box" style="margin-bottom:16px; background:linear-gradient(115deg, rgba(177,138,255,.14), rgba(125,216,255,.06)); border-color:rgba(177,138,255,.4);">
         <b style="color:var(--gold);">⭐ Kdyby appka mohla vsadit jen jednu věc</b>
         <p style="margin:6px 0 0; font-size:13px; font-weight:700; color:var(--text);">${m.top_pick.label}</p>
         <p style="margin:4px 0 0; font-size:12px; line-height:1.5; color:var(--text-2);">${m.top_pick.reason}</p>
