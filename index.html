@@ -955,12 +955,12 @@ button:active, .seg-btn:active{ transform:scale(.96); transition-duration:.08s; 
   <div class="navwrap">
     <div class="segmented" id="segmented" role="tablist" aria-label="Hlavní navigace">
       <div class="seg-thumb" id="segThumb"></div>
-      <button class="seg-btn active" data-i="0" role="tab" aria-selected="true"><span class="seg-icon">📊</span><span class="seg-label">Přehled</span></button>
-      <button class="seg-btn" data-i="1" role="tab" aria-selected="false"><span class="seg-icon">💰</span><span class="seg-label">Value</span><span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
+      <button class="seg-btn active" data-i="0" role="tab" aria-selected="true"><span class="seg-icon">🎲</span><span class="seg-label">Kolo</span></button>
+      <button class="seg-btn" data-i="1" role="tab" aria-selected="false"><span class="seg-icon">📊</span><span class="seg-label">Přehled</span></button>
       <button class="seg-btn" data-i="2" role="tab" aria-selected="false"><span class="seg-icon">📈</span><span class="seg-label">Analýza</span></button>
       <button class="seg-btn" data-i="3" role="tab" aria-selected="false"><span class="seg-icon">📡</span><span class="seg-label">Radar</span></button>
       <button class="seg-btn" data-i="4" role="tab" aria-selected="false"><span class="seg-icon">📅</span><span class="seg-label">Kalendář</span></button>
-      <button class="seg-btn" data-i="5" role="tab" aria-selected="false"><span class="seg-icon">🎲</span><span class="seg-label">Kolo</span></button>
+      <button class="seg-btn" data-i="5" role="tab" aria-selected="false"><span class="seg-icon">💰</span><span class="seg-label">Value</span><span id="valueBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="6" role="tab" aria-selected="false"><span class="seg-icon">👤</span><span class="seg-label seg-label-full">Můj profil</span><span class="seg-label seg-label-short">Profil</span><span id="settleBadge" class="tab-badge" style="display:none;"></span></button>
       <button class="seg-btn" data-i="7" role="tab" aria-selected="false"><span class="seg-icon">🏆</span><span class="seg-label">Žebříček</span></button>
       <button class="seg-btn" data-i="8" id="adminTabBtn" role="tab" aria-selected="false" style="display:none;"><span class="seg-icon">🛠️</span><span class="seg-label">Admin</span></button>
@@ -968,12 +968,12 @@ button:active, .seg-btn:active{ transform:scale(.96); transition-duration:.08s; 
   </div>
 
   <div class="pager" id="pager">
+    <div class="panel" id="panel-6" role="tabpanel"></div>
     <div class="panel" id="panel-0" role="tabpanel"></div>
-    <div class="panel" id="panel-1" role="tabpanel"></div>
     <div class="panel" id="panel-2" role="tabpanel"></div>
     <div class="panel" id="panel-3" role="tabpanel"></div>
     <div class="panel" id="panel-5" role="tabpanel"></div>
-    <div class="panel" id="panel-6" role="tabpanel"></div>
+    <div class="panel" id="panel-1" role="tabpanel"></div>
     <div class="panel" id="panel-7" role="tabpanel"></div>
     <div class="panel" id="panel-lb" role="tabpanel"></div>
     <div class="panel" id="panel-9" role="tabpanel"></div>
@@ -2034,9 +2034,9 @@ function renderOverview(){
 
     <div class="section-lbl">Přehled dne</div>
     <div class="kpi-row">
-      <button class="kpi" onclick="setActiveTab(1)"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></button>
-      <button class="kpi" onclick="${heroMatch ? `openModal('${heroMatch.id}')` : `setActiveTab(1)`}"><div class="val mono" style="color:var(--emerald)">${realValueOnes.length ? fmtPct(bestEv) : '—'}</div><div class="lbl">Nejlepší value</div></button>
-      <button class="kpi" onclick="setActiveTab(1)"><div class="val mono" style="color:var(--gold)">${realValueOnes.length ? fmtPct(avgEv) : '—'}</div><div class="lbl">Průměrné EV</div></button>
+      <button class="kpi" onclick="setActiveTab(5)"><div class="val mono">${scanned}</div><div class="lbl">Příležitostí dnes</div></button>
+      <button class="kpi" onclick="${heroMatch ? `openModal('${heroMatch.id}')` : `setActiveTab(5)`}"><div class="val mono" style="color:var(--emerald)">${realValueOnes.length ? fmtPct(bestEv) : '—'}</div><div class="lbl">Nejlepší value</div></button>
+      <button class="kpi" onclick="setActiveTab(5)"><div class="val mono" style="color:var(--gold)">${realValueOnes.length ? fmtPct(avgEv) : '—'}</div><div class="lbl">Průměrné EV</div></button>
       <button class="kpi" onclick="setActiveTab(6)"><div class="val mono">${realValueOnes.length ? fmtCzk(recStake) : '—'}</div><div class="lbl">Doporučený vklad</div></button>
     </div>
 
@@ -2311,7 +2311,7 @@ function renderRadar(){
 
   el.innerHTML = `
     <h1 class="title">Radar příležitostí</h1>
-    <p class="subtle">Appka tady ukazuje jen to, co umí skutečně spočítat — žádné předstírané metody. Hledáš konkrétní value tipy? Ty jsou přehledně ve <a href="#" onclick="setActiveTab(1); return false;" style="color:var(--gold); text-decoration:underline;">Value sázkách</a> — Radar je spíš úplný přehled toho, co appka vůbec sleduje.</p>
+    <p class="subtle">Appka tady ukazuje jen to, co umí skutečně spočítat — žádné předstírané metody. Hledáš konkrétní value tipy? Ty jsou přehledně ve <a href="#" onclick="setActiveTab(5); return false;" style="color:var(--gold); text-decoration:underline;">Value sázkách</a> — Radar je spíš úplný přehled toho, co appka vůbec sleduje.</p>
 
     <div class="warn-box">⚠️ Appka nemá vlastní ELO model ani nezávislé srovnání proti "ostrým" knihám (Pinnacle/Betfair) — dřív appka tuhle sekci takhle popisovala, ale ve skutečnosti to nedělala. Value se počítá jen tam, kde appka má reálný kurz uložený u zápasu (viz "Zdroj: real-api" v detailu).</div>
 
